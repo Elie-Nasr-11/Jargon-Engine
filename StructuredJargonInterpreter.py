@@ -271,7 +271,7 @@ class StructuredJargonInterpreter:
         return '\n'.join(str(x) for x in self.output_log)
 
 code = """
-JARGON CODE GOES HERE
+
 """
 
 interpreter = StructuredJargonInterpreter()
