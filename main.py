@@ -8,5 +8,5 @@ interpreter = StructuredJargonInterpreter()
 async def run_code(request: Request):
     data = await request.json()
     code = data.get("code", "")
-    output = interpreter.run(code)
-    return {"output": output}
+    interpreter.run(code)
+    return {"output": interpreter.get_output()}
