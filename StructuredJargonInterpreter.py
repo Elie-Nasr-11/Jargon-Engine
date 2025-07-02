@@ -8,27 +8,23 @@ class StructuredJargonInterpreter:
         self.break_loop = False
         self.awaiting_input = False
         self.ask_prompt = ""
-        self.pending_block = None
+        self.pending_block = None  # can be a function or list
         self.pending_index = 0
         self.pending_stack = []
 
     def run(self, code: str):
-        self.memory.clear()
-        self.output_log.clear()
-        self.break_loop = False
-        self.awaiting_input = False
-        self.ask_prompt = ""
-        self.pending_block = None
-        self.pending_index = 0
-        self.pending_stack = []
+        self.__init__()  # reset everything
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
 
     def resume(self, user_input: str):
-        self.awaiting_input = False
-        self.ask_prompt = ""
+        if not self.pending_stack:
+            self.output_log.append("[ERROR] No variable to assign input to.")
+            return
         var = self.pending_stack.pop()
         self.memory[var] = user_input
+        self.awaiting_input = False
+        self.ask_prompt = ""
         if callable(self.pending_block):
             self.pending_block()
         else:
@@ -42,43 +38,38 @@ class StructuredJargonInterpreter:
                 self.pending_block = block
                 self.pending_index = i
                 return
-            line = block[i]
             steps += 1
             if steps > self.max_steps:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps (possible infinite loop).")
                 break
             if self.break_loop:
                 break
+            line = block[i]
             if line == "BREAK":
                 self.break_loop = True
                 break
-            if line.startswith("SET "):
-                self.handle_set(line)
-            elif line.startswith("PRINT "):
-                self.handle_print(line)
-            elif line.startswith("ADD "):
-                self.handle_add(line)
-            elif line.startswith("REMOVE "):
-                self.handle_remove(line)
+            elif line.startswith("SET "): self.handle_set(line)
+            elif line.startswith("PRINT "): self.handle_print(line)
+            elif line.startswith("ADD "): self.handle_add(line)
+            elif line.startswith("REMOVE "): self.handle_remove(line)
             elif line.startswith("ASK "):
-                if self.handle_ask(line):
-                    return
+                if self.handle_ask(line): return
             elif line.startswith("IF "):
-                sub_block, jump_to = self.collect_block(block, i, "END")
+                sub_block, jump = self.collect_block(block, i, "END")
                 self.handle_if_else(sub_block)
-                i = jump_to - 1
+                i = jump - 1
             elif line.startswith("REPEAT_UNTIL"):
-                sub_block, jump_to = self.collect_block(block, i, "END")
+                sub_block, jump = self.collect_block(block, i, "END")
                 self.handle_repeat_until(sub_block)
-                i = jump_to - 1
+                i = jump - 1
             elif line.startswith("REPEAT "):
-                sub_block, jump_to = self.collect_block(block, i, "END")
+                sub_block, jump = self.collect_block(block, i, "END")
                 self.handle_repeat_n_times(sub_block)
-                i = jump_to - 1
+                i = jump - 1
             elif line.startswith("REPEAT_FOR_EACH"):
-                sub_block, jump_to = self.collect_block(block, i, "END")
+                sub_block, jump = self.collect_block(block, i, "END")
                 self.handle_repeat_for_each(sub_block)
-                i = jump_to - 1
+                i = jump - 1
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
             i += 1
@@ -101,23 +92,19 @@ class StructuredJargonInterpreter:
         return block, i + 1
 
     def handle_set(self, line):
-        match_indexed = re.match(r'SET\s+(\w+)\[(.+?)\]\s*\((.+)\)', line)
-        match_simple = re.match(r'SET\s+(\w+)\s*\((.+)\)', line)
-        if match_indexed:
-            var, index_expr, value_expr = match_indexed.groups()
-            index = self.safe_eval(index_expr)
-            value = self.safe_eval(value_expr)
+        m_idx = re.match(r'SET\s+(\w+)\[(.+?)\]\s*\((.+)\)', line)
+        m_simple = re.match(r'SET\s+(\w+)\s*\((.+)\)', line)
+        if m_idx:
+            var, i_expr, v_expr = m_idx.groups()
+            i = self.safe_eval(i_expr)
+            v = self.safe_eval(v_expr)
             if var in self.memory and isinstance(self.memory[var], list):
-                try:
-                    self.memory[var][index] = value
-                except Exception:
-                    self.output_log.append(f"[ERROR] Failed to assign {var}[{index}]")
-            else:
-                self.output_log.append(f"[ERROR] {var} is not a list")
-        elif match_simple:
-            var, expr = match_simple.groups()
-            value = self.safe_eval(expr)
-            self.memory[var] = value
+                try: self.memory[var][i] = v
+                except: self.output_log.append(f"[ERROR] Failed to assign {var}[{i}]")
+            else: self.output_log.append(f"[ERROR] {var} is not a list")
+        elif m_simple:
+            var, expr = m_simple.groups()
+            self.memory[var] = self.safe_eval(expr)
         else:
             self.output_log.append(f"[ERROR] Invalid SET syntax: {line}")
 
@@ -127,137 +114,115 @@ class StructuredJargonInterpreter:
         self.output_log.append(str(val))
 
     def handle_add(self, line):
-        match = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
-        if not match:
+        m = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
+        if not m:
             self.output_log.append(f"[ERROR] Invalid ADD syntax: {line}")
             return
-        value_expr, list_name = match.groups()
-        value = self.safe_eval(value_expr)
-        if list_name not in self.memory or not isinstance(self.memory[list_name], list):
-            self.memory[list_name] = []
-        self.memory[list_name].append(value)
+        v_expr, lst = m.groups()
+        v = self.safe_eval(v_expr)
+        if lst not in self.memory or not isinstance(self.memory[lst], list):
+            self.memory[lst] = []
+        self.memory[lst].append(v)
 
     def handle_remove(self, line):
-        match = re.match(r'REMOVE\s+(.+?)\s+from\s+(\w+)', line)
-        if not match:
+        m = re.match(r'REMOVE\s+(.+?)\s+from\s+(\w+)', line)
+        if not m:
             self.output_log.append(f"[ERROR] Invalid REMOVE syntax: {line}")
             return
-        value_expr, list_name = match.groups()
-        value = self.safe_eval(value_expr)
-        if list_name in self.memory and isinstance(self.memory[list_name], list):
-            try:
-                self.memory[list_name].remove(value)
-            except ValueError:
-                self.output_log.append(f"[ERROR] Value {value} not found in {list_name}")
+        v_expr, lst = m.groups()
+        v = self.safe_eval(v_expr)
+        if lst in self.memory and isinstance(self.memory[lst], list):
+            try: self.memory[lst].remove(v)
+            except ValueError: self.output_log.append(f"[ERROR] Value {v} not found in {lst}")
         else:
-            self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
+            self.output_log.append(f"[ERROR] {lst} is not a list or not defined")
 
     def handle_ask(self, line):
-        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-        if not match:
+        m = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+        if not m:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return False
-        self.ask_prompt, var = match.groups()
+        self.ask_prompt, var = m.groups()
         self.awaiting_input = True
         self.pending_stack.append(var)
         return True
 
     def handle_if_else(self, block):
-        condition_line = block[0]
-        condition = condition_line.replace("IF", "").replace("THEN", "").strip()
-        true_block = []
-        false_block = []
-        current_block = true_block
-        i = 1
-        nested = 0
+        cond = block[0].replace("IF", "").replace("THEN", "").strip()
+        true_block, false_block, current, i, nest = [], [], True, 1, 0
         while i < len(block) - 1:
             line = block[i]
-            if line == "ELSE" and nested == 0:
-                current_block = false_block
+            if line == "ELSE" and nest == 0:
+                current = False
                 i += 1
                 continue
-            if line.startswith("IF "):
-                nested += 1
-            elif line == "END":
-                if nested > 0:
-                    nested -= 1
-            current_block.append(line)
+            if line.startswith("IF "): nest += 1
+            elif line == "END" and nest > 0: nest -= 1
+            (true_block if current else false_block).append(line)
             i += 1
-        if self.evaluate_condition(condition):
-            self.execute_block(true_block)
-        else:
-            self.execute_block(false_block)
+        self.execute_block(true_block if self.evaluate_condition(cond) else false_block)
 
     def handle_repeat_until(self, block):
-        condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
-        def repeat():
-            count = 0
-            while not self.evaluate_condition(condition_line):
+        cond = block[0].replace("REPEAT_UNTIL", "").strip()
+        def loop():
+            while not self.evaluate_condition(cond):
                 self.break_loop = False
                 self.execute_block(block[1:-1])
                 if self.awaiting_input:
-                    self.pending_block = repeat
+                    self.pending_block = loop
                     return
-                if self.break_loop:
-                    break
-                count += 1
-                if count > self.max_steps:
-                    self.output_log.append("[ERROR] Loop exceeded max iterations.")
-                    break
-        repeat()
+                if self.break_loop: break
+        loop()
 
     def handle_repeat_n_times(self, block):
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
-        times = int(match.group(1))
-        counter = [0]
-        def repeat():
-            while counter[0] < times:
+        times, count = int(match.group(1)), 0
+        def loop():
+            nonlocal count
+            while count < times:
                 self.break_loop = False
                 self.execute_block(block[1:-1])
                 if self.awaiting_input:
-                    self.pending_block = repeat
+                    self.pending_block = loop
                     return
-                if self.break_loop:
-                    break
-                counter[0] += 1
-        repeat()
+                if self.break_loop: break
+                count += 1
+        loop()
 
     def handle_repeat_for_each(self, block):
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
-        var, iterable = match.groups()
-        items = self.memory.get(iterable, [])
-        index = [0]
-        def repeat():
-            while index[0] < len(items):
-                self.memory[var] = items[index[0]]
+        var, lst = match.groups()
+        values = self.memory.get(lst, [])
+        idx = 0
+        def loop():
+            nonlocal idx
+            while idx < len(values):
+                self.memory[var] = values[idx]
                 self.break_loop = False
                 self.execute_block(block[1:-1])
                 if self.awaiting_input:
-                    self.pending_block = repeat
+                    self.pending_block = loop
                     return
-                if self.break_loop:
-                    break
-                index[0] += 1
-        repeat()
+                if self.break_loop: break
+                idx += 1
+        loop()
 
     def safe_eval(self, expr):
         expr = expr.strip()
         try:
             tokens = re.findall(r'\b\w+\b', expr)
-            for token in tokens:
-                if token in self.memory and isinstance(self.memory[token], str):
-                    expr = re.sub(rf'\b{token}\b', f'"{self.memory[token]}"', expr)
-            code = compile(expr, "<string>", "eval")
-            return eval(code, {"__builtins__": None}, {
-                "int": int, "abs": abs, "min": min, "max": max,
-                "float": float, "round": round, "list": list, "str": str, "bool": bool,
-                **self.memory
+            for t in tokens:
+                if t in self.memory and isinstance(self.memory[t], str):
+                    expr = re.sub(rf'\b{t}\b', f'"{self.memory[t]}"', expr)
+            return eval(compile(expr, "<string>", "eval"), {"__builtins__": None}, {
+                "int": int, "abs": abs, "min": min, "max": max, "float": float,
+                "round": round, "list": list, "str": str, "bool": bool, **self.memory
             })
         except Exception as e:
             self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
@@ -266,33 +231,22 @@ class StructuredJargonInterpreter:
     def evaluate_condition(self, text: str) -> bool:
         try:
             if "AND" in text:
-                parts = text.split("AND")
-                return all(self.evaluate_condition(p.strip()) for p in parts)
-            elif "OR" in text:
-                parts = text.split("OR")
-                return any(self.evaluate_condition(p.strip()) for p in parts)
-            replacements = [
-                ("is equal to", "=="),
-                ("is not equal to", "!="),
-                ("is greater than or equal to", ">="),
-                ("is less than or equal to", "<="),
-                ("is greater than", ">"),
-                ("is less than", "<"),
-                ("is in", "in")
-            ]
-            for phrase, symbol in replacements:
+                return all(self.evaluate_condition(p.strip()) for p in text.split("AND"))
+            if "OR" in text:
+                return any(self.evaluate_condition(p.strip()) for p in text.split("OR"))
+            for phrase, sym in [("is equal to", "=="), ("is not equal to", "!="),
+                                ("is greater than or equal to", ">="), ("is less than or equal to", "<="),
+                                ("is greater than", ">"), ("is less than", "<"), ("is in", "in")]:
                 if phrase in text:
                     a, b = text.split(phrase)
-                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
+                    return self.safe_eval(f"({a.strip()}) {sym} ({b.strip()})")
             if "is even" in text:
-                expr = text.split("is even")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 0
+                return self.safe_eval(text.split("is even")[0].strip()) % 2 == 0
             if "is odd" in text:
-                expr = text.split("is odd")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 1
+                return self.safe_eval(text.split("is odd")[0].strip()) % 2 == 1
             if "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(f"({a.strip()})") >= len(self.safe_eval(f"({b.strip()})"))
+                return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
             self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
             return False
         except Exception as e:
@@ -300,7 +254,7 @@ class StructuredJargonInterpreter:
             return False
 
     def get_output(self):
-        return '\n'.join(str(x) for x in self.output_log)
+        return "\n".join(str(x) for x in self.output_log)
 
     def provide_answer(self, user_input: str):
         if not self.awaiting_input:
