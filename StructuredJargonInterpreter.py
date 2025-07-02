@@ -270,36 +270,33 @@ class StructuredJargonInterpreter:
                 parts = text.split("OR")
                 return any(self.evaluate_condition(p.strip()) for p in parts)
     
-            comparisons = [
-                ("is equal to", lambda a, b: a == b),
-                ("is not equal to", lambda a, b: a != b),
-                ("is greater than or equal to", lambda a, b: a >= b),
-                ("is less than or equal to", lambda a, b: a <= b),
-                ("is greater than", lambda a, b: a > b),
-                ("is less than", lambda a, b: a < b),
-                ("is in", lambda a, b: a in b)
+            replacements = [
+                ("is equal to", "=="),
+                ("is not equal to", "!="),
+                ("is greater than or equal to", ">="),
+                ("is less than or equal to", "<="),
+                ("is greater than", ">"),
+                ("is less than", "<"),
+                ("is in", "in")
             ]
     
-            for phrase, func in comparisons:
+            for phrase, symbol in replacements:
                 if phrase in text:
-                    left_text, right_text = text.split(phrase)
-                    left_val = self.safe_eval(left_text.strip())
-                    right_val = self.safe_eval(right_text.strip())
-                    return func(left_val, right_val)
+                    a, b = text.split(phrase)
+                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
     
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
-                return self.safe_eval(expr) % 2 == 0
+                return self.safe_eval(f"({expr})") % 2 == 0
             if "is odd" in text:
                 expr = text.split("is odd")[0].strip()
-                return self.safe_eval(expr) % 2 == 1
+                return self.safe_eval(f"({expr})") % 2 == 1
             if "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
+                return self.safe_eval(f"({a.strip()})") >= len(self.safe_eval(f"({b.strip()})"))
     
             self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
             return False
-    
         except Exception as e:
             self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
             return False
