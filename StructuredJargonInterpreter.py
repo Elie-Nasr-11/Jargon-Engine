@@ -265,7 +265,7 @@ class StructuredJargonInterpreter:
             elif "OR" in text:
                 parts = text.split("OR")
                 return any(self.evaluate_condition(p.strip()) for p in parts)
-
+    
             replacements = [
                 ("is equal to", "=="),
                 ("is not equal to", "!="),
@@ -275,22 +275,22 @@ class StructuredJargonInterpreter:
                 ("is less than", "<"),
                 ("is in", "in")
             ]
-
+    
             for phrase, symbol in replacements:
                 if phrase in text:
                     a, b = text.split(phrase)
-                    return self.safe_eval(f"{a.strip()} {symbol} {b.strip()}")
-
+                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
+    
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
-                return self.safe_eval(expr) % 2 == 0
+                return self.safe_eval(f"({expr})") % 2 == 0
             if "is odd" in text:
                 expr = text.split("is odd")[0].strip()
-                return self.safe_eval(expr) % 2 == 1
+                return self.safe_eval(f"({expr})") % 2 == 1
             if "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
-
+                return self.safe_eval(f"({a.strip()})") >= len(self.safe_eval(f"({b.strip()})"))
+    
             self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
             return False
         except Exception as e:
