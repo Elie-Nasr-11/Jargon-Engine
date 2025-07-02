@@ -11,6 +11,7 @@ class StructuredJargonInterpreter:
         self.pending_block = None
         self.pending_index = 0
         self.pending_stack = []
+        self.resume_callback = None
 
     def run(self, code: str):
         self.memory.clear()
@@ -21,6 +22,7 @@ class StructuredJargonInterpreter:
         self.pending_block = None
         self.pending_index = 0
         self.pending_stack = []
+        self.resume_callback = None
 
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
@@ -28,16 +30,11 @@ class StructuredJargonInterpreter:
     def resume(self, user_input: str):
         self.awaiting_input = False
         self.ask_prompt = ""
-        self.memory[self.pending_stack[-1]] = user_input
-        if self.pending_index == -999:
-            first_line = self.pending_block[0]
-            if first_line.startswith("REPEAT_UNTIL"):
-                self.handle_repeat_until(self.pending_block)
-            elif first_line.startswith("REPEAT "):
-                self.handle_repeat_n_times(self.pending_block)
-            elif first_line.startswith("REPEAT_FOR_EACH"):
-                self.handle_repeat_for_each(self.pending_block)
-        else:
+        if self.pending_stack:
+            self.memory[self.pending_stack[-1]] = user_input
+        if self.resume_callback:
+            self.resume_callback()
+        elif self.pending_block:
             self.execute_block(self.pending_block, self.pending_index)
 
     def execute_block(self, block, start=0):
@@ -196,19 +193,17 @@ class StructuredJargonInterpreter:
 
     def handle_repeat_until(self, block):
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
-        count = 0
+
+        def resume_loop():
+            self.handle_repeat_until(block)
+
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = block
-                self.pending_index = -999
+                self.resume_callback = resume_loop
                 return
             if self.break_loop:
-                break
-            count += 1
-            if count > self.max_steps:
-                self.output_log.append("[ERROR] Loop exceeded max iterations.")
                 break
 
     def handle_repeat_n_times(self, block):
@@ -217,15 +212,20 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         times = int(match.group(1))
-        for _ in range(times):
+        index = 0
+
+        def resume_loop():
+            self.handle_repeat_n_times(block[index:])
+
+        while index < times:
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = block
-                self.pending_index = -999
+                self.resume_callback = resume_loop
                 return
             if self.break_loop:
                 break
+            index += 1
 
     def handle_repeat_for_each(self, block):
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
@@ -233,16 +233,22 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
         var, iterable = match.groups()
-        for item in self.memory.get(iterable, []):
-            self.memory[var] = item
+        items = list(self.memory.get(iterable, []))
+        index = 0
+
+        def resume_loop():
+            self.handle_repeat_for_each(block)
+
+        while index < len(items):
+            self.memory[var] = items[index]
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = block
-                self.pending_index = -999
+                self.resume_callback = resume_loop
                 return
             if self.break_loop:
                 break
+            index += 1
 
     def safe_eval(self, expr):
         expr = expr.strip()
@@ -267,32 +273,32 @@ class StructuredJargonInterpreter:
                 return any(self.evaluate_condition(p.strip()) for p in parts)
             elif "is equal to" in text:
                 a, b = text.split("is equal to")
-                return self.safe_eval(a) == self.safe_eval(b)
+                return self.safe_eval(a.strip()) == self.safe_eval(b.strip())
             elif "is not equal to" in text:
                 a, b = text.split("is not equal to")
-                return self.safe_eval(a) != self.safe_eval(b)
+                return self.safe_eval(a.strip()) != self.safe_eval(b.strip())
             elif "is greater than or equal to" in text:
                 a, b = text.split("is greater than or equal to")
-                return self.safe_eval(a) >= self.safe_eval(b)
+                return self.safe_eval(a.strip()) >= self.safe_eval(b.strip())
             elif "is less than or equal to" in text:
                 a, b = text.split("is less than or equal to")
-                return self.safe_eval(a) <= self.safe_eval(b)
+                return self.safe_eval(a.strip()) <= self.safe_eval(b.strip())
             elif "is greater than" in text:
                 a, b = text.split("is greater than")
-                return self.safe_eval(a) > self.safe_eval(b)
+                return self.safe_eval(a.strip()) > self.safe_eval(b.strip())
             elif "is less than" in text:
                 a, b = text.split("is less than")
-                return self.safe_eval(a) < self.safe_eval(b)
+                return self.safe_eval(a.strip()) < self.safe_eval(b.strip())
             elif "is even" in text:
-                return self.safe_eval(text.split("is even")[0]) % 2 == 0
+                return self.safe_eval(text.split("is even")[0].strip()) % 2 == 0
             elif "is odd" in text:
-                return self.safe_eval(text.split("is odd")[0]) % 2 == 1
+                return self.safe_eval(text.split("is odd")[0].strip()) % 2 == 1
             elif "is in" in text:
                 a, b = text.split("is in")
-                return self.safe_eval(a) in self.safe_eval(b)
+                return self.safe_eval(a.strip()) in self.safe_eval(b.strip())
             elif "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(a) >= len(self.safe_eval(b))
+                return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
             else:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
