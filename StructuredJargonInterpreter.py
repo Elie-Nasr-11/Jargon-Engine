@@ -2,52 +2,53 @@ import re
 
 class StructuredJargonInterpreter:
     def __init__(self):
-        self.reset_state()
-
-    def reset_state(self):
         self.memory = {}
         self.output_log = []
         self.max_steps = 1000
         self.break_loop = False
         self.awaiting_input = False
-        self.ask_prompt = None
-        self.ask_variable = None
+        self.ask_prompt = ""
         self.pending_block = None
         self.pending_index = 0
+        self.pending_stack = []
 
     def run(self, code: str):
-        self.reset_state()
+        self.memory.clear()
+        self.output_log.clear()
+        self.break_loop = False
+        self.awaiting_input = False
+        self.ask_prompt = ""
+        self.pending_block = None
+        self.pending_index = 0
+        self.pending_stack = []
+
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
 
-    def provide_answer(self, user_input):
-        if not self.awaiting_input or not self.ask_variable:
-            self.output_log.append("[ERROR] No input expected right now.")
-            return self.get_output()
-
-        self.memory[self.ask_variable] = user_input
+    def resume(self, user_input: str):
         self.awaiting_input = False
-        self.ask_prompt = None
-        self.ask_variable = None
-
-        # Resume execution
+        self.ask_prompt = ""
+        self.memory[self.pending_stack[-1]] = user_input
         self.execute_block(self.pending_block, self.pending_index)
-        return self.get_output()
 
-    def execute_block(self, block, start_index=0):
-        i = start_index
+    def execute_block(self, block, start=0):
+        i = start
         steps = 0
         while i < len(block):
+            if self.awaiting_input:
+                self.pending_block = block
+                self.pending_index = i
+                return
             line = block[i]
             steps += 1
             if steps > self.max_steps:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps (possible infinite loop).")
-                return
+                break
             if self.break_loop:
-                return
+                break
             if line == "BREAK":
                 self.break_loop = True
-                return
+                break
             if line.startswith("SET "):
                 self.handle_set(line)
             elif line.startswith("PRINT "):
@@ -57,17 +58,8 @@ class StructuredJargonInterpreter:
             elif line.startswith("REMOVE "):
                 self.handle_remove(line)
             elif line.startswith("ASK "):
-                match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-                if match:
-                    question, var = match.groups()
-                    self.awaiting_input = True
-                    self.ask_prompt = question
-                    self.ask_variable = var
-                    self.pending_block = block
-                    self.pending_index = i + 1
+                if self.handle_ask(line):
                     return
-                else:
-                    self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             elif line.startswith("IF "):
                 sub_block, jump_to = self.collect_block(block, i, "END")
                 self.handle_if_else(sub_block)
@@ -157,6 +149,16 @@ class StructuredJargonInterpreter:
         else:
             self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
 
+    def handle_ask(self, line):
+        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+        if not match:
+            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+            return False
+        self.ask_prompt, var = match.groups()
+        self.awaiting_input = True
+        self.pending_stack.append(var)
+        return True
+
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
@@ -178,7 +180,6 @@ class StructuredJargonInterpreter:
                     nested -= 1
             current_block.append(line)
             i += 1
-
         if self.evaluate_condition(condition):
             self.execute_block(true_block)
         else:
@@ -190,8 +191,11 @@ class StructuredJargonInterpreter:
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop or self.awaiting_input:
+            if self.awaiting_input:
+                self.pending_block = lambda: self.handle_repeat_until(block)
                 return
+            if self.break_loop:
+                break
             count += 1
             if count > self.max_steps:
                 self.output_log.append("[ERROR] Loop exceeded max iterations.")
@@ -206,8 +210,11 @@ class StructuredJargonInterpreter:
         for _ in range(times):
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop or self.awaiting_input:
+            if self.awaiting_input:
+                self.pending_block = lambda: self.handle_repeat_n_times(block)
                 return
+            if self.break_loop:
+                break
 
     def handle_repeat_for_each(self, block):
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
@@ -219,8 +226,11 @@ class StructuredJargonInterpreter:
             self.memory[var] = item
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop or self.awaiting_input:
+            if self.awaiting_input:
+                self.pending_block = lambda: self.handle_repeat_for_each(block)
                 return
+            if self.break_loop:
+                break
 
     def safe_eval(self, expr):
         expr = expr.strip()
@@ -238,9 +248,11 @@ class StructuredJargonInterpreter:
     def evaluate_condition(self, text: str) -> bool:
         try:
             if "AND" in text:
-                return all(self.evaluate_condition(p.strip()) for p in text.split("AND"))
+                parts = text.split("AND")
+                return all(self.evaluate_condition(p.strip()) for p in parts)
             elif "OR" in text:
-                return any(self.evaluate_condition(p.strip()) for p in text.split("OR"))
+                parts = text.split("OR")
+                return any(self.evaluate_condition(p.strip()) for p in parts)
             elif "is equal to" in text:
                 a, b = text.split("is equal to")
                 return self.safe_eval(a) == self.safe_eval(b)
@@ -278,6 +290,12 @@ class StructuredJargonInterpreter:
 
     def get_output(self):
         return '\n'.join(str(x) for x in self.output_log)
+
+    def provide_answer(self, user_input: str):
+        if not self.awaiting_input:
+            return None
+        self.resume(user_input)
+        return self.get_output()
 
 code = """
 
