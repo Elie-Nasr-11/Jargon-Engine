@@ -283,9 +283,9 @@ class StructuredJargonInterpreter:
             for phrase, func in replacements:
                 if phrase in text:
                     a, b = text.split(phrase)
-                    a_val = self.safe_eval(a.strip())
-                    b_val = self.safe_eval(b.strip())
-                    return func(a_val, b_val)
+                    left = self.safe_eval(a.strip())
+                    right = self.safe_eval(b.strip())
+                    return func(left, right)
     
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
