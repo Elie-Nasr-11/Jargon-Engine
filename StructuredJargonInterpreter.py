@@ -6,18 +6,28 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.max_steps = 1000
         self.break_loop = False
+        self.awaiting_input = False
+        self.ask_prompt = None
+        self.ask_target = None
+        self.current_index = 0
+        self.lines = []
 
     def run(self, code: str):
         self.memory.clear()
         self.output_log.clear()
         self.break_loop = False
+        self.awaiting_input = False
+        self.ask_prompt = None
+        self.ask_target = None
+        self.current_index = 0
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
 
     def execute_block(self, block):
-        i = 0
+        i = self.current_index
         steps = 0
         while i < len(block):
+            self.current_index = i
             line = block[i]
             steps += 1
             if steps > self.max_steps:
@@ -38,6 +48,8 @@ class StructuredJargonInterpreter:
                 self.handle_remove(line)
             elif line.startswith("ASK "):
                 self.handle_ask(line)
+                if self.awaiting_input:
+                    return
             elif line.startswith("IF "):
                 sub_block, jump_to = self.collect_block(block, i, "END")
                 self.handle_if_else(sub_block)
@@ -57,6 +69,7 @@ class StructuredJargonInterpreter:
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
             i += 1
+        self.current_index = i
 
     def collect_block(self, lines, start, end_keyword):
         block = [lines[start]]
@@ -133,7 +146,20 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        self.memory[var] = input(question + " ")
+        self.ask_prompt = question
+        self.ask_target = var
+        self.awaiting_input = True
+
+    def provide_answer(self, user_input):
+        if not self.awaiting_input:
+            return "[ERROR] No question awaiting answer"
+        self.memory[self.ask_target] = user_input
+        self.awaiting_input = False
+        self.ask_prompt = None
+        self.ask_target = None
+        self.current_index += 1
+        self.execute_block(self.lines[self.current_index:])
+        return self.get_output()
 
     def handle_if_else(self, block):
         condition_line = block[0]
