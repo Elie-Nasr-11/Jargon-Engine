@@ -28,7 +28,8 @@ class StructuredJargonInterpreter:
     def resume(self, user_input: str):
         self.awaiting_input = False
         self.ask_prompt = ""
-        self.memory[self.pending_stack[-1]] = user_input
+        var = self.pending_stack[-1]
+        self.memory[var] = f'"{user_input}"'
         if self.pending_index == -999:
             first_line = self.pending_block[0]
             if first_line.startswith("REPEAT_UNTIL"):
