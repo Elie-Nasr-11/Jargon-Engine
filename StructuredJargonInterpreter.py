@@ -28,8 +28,8 @@ class StructuredJargonInterpreter:
     def resume(self, user_input: str):
         self.awaiting_input = False
         self.ask_prompt = ""
-        var = self.pending_stack[-1]
-        self.memory[var] = f'"{user_input}"'
+        var = self.pending_stack.pop()
+        self.memory[var] = user_input  # do NOT wrap in quotes
         if self.pending_index == -999:
             first_line = self.pending_block[0]
             if first_line.startswith("REPEAT_UNTIL"):
@@ -248,12 +248,7 @@ class StructuredJargonInterpreter:
     def safe_eval(self, expr):
         expr = expr.strip()
         try:
-            tokens = re.findall(r'\b\w+\b', expr)
-            for token in tokens:
-                if token in self.memory and isinstance(self.memory[token], str):
-                    expr = re.sub(rf'\b{token}\b', f'"{self.memory[token]}"', expr)
-            code = compile(expr, "<string>", "eval")
-            return eval(code, {"__builtins__": None}, {
+            return eval(expr, {"__builtins__": None}, {
                 "int": int, "abs": abs, "min": min, "max": max,
                 "float": float, "round": round, "list": list, "str": str, "bool": bool,
                 **self.memory
@@ -270,7 +265,7 @@ class StructuredJargonInterpreter:
             elif "OR" in text:
                 parts = text.split("OR")
                 return any(self.evaluate_condition(p.strip()) for p in parts)
-    
+
             replacements = [
                 ("is equal to", "=="),
                 ("is not equal to", "!="),
@@ -280,22 +275,22 @@ class StructuredJargonInterpreter:
                 ("is less than", "<"),
                 ("is in", "in")
             ]
-    
+
             for phrase, symbol in replacements:
                 if phrase in text:
                     a, b = text.split(phrase)
                     return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
-    
+
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 0
+                return self.safe_eval(expr) % 2 == 0
             if "is odd" in text:
                 expr = text.split("is odd")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 1
+                return self.safe_eval(expr) % 2 == 1
             if "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(f"({a.strip()})") >= len(self.safe_eval(f"({b.strip()})"))
-    
+                return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
+
             self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
             return False
         except Exception as e:
