@@ -17,5 +17,7 @@ async def run_code(request: Request):
     code = data.get("code", "")
     interpreter = StructuredJargonInterpreter()
     interpreter.run(code)
+    if interpreter.ask_state:
+        return { "ask": interpreter.ask_state }
     output = interpreter.get_output()
-    return {"output": output}
+    return { "output": output }
