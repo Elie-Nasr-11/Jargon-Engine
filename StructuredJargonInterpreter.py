@@ -280,7 +280,11 @@ class StructuredJargonInterpreter:
                 return self.safe_eval(a) in self.safe_eval(b)
             elif "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                return self.safe_eval(a) >= len(self.safe_eval(b))
+                right = self.safe_eval(b)
+                if not hasattr(right, "__len__"):
+                    self.output_log.append(f"[ERROR] '{b.strip()}' is not a sequence — cannot use 'reaches end of'")
+                    return False
+                return self.safe_eval(a) >= len(right)
             else:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
