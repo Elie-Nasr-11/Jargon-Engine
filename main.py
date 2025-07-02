@@ -23,7 +23,7 @@ async def run_code(request: Request):
         code = data.get("input", "")
         interpreter.run(code)
         output = interpreter.get_output()
-        if hasattr(interpreter, 'awaiting_input') and interpreter.awaiting_input:
+        if interpreter.awaiting_input:
             return {"ask": interpreter.ask_prompt}
         return {"result": output}
     except Exception as e:
@@ -36,14 +36,10 @@ async def answer_question(request: Request):
         print("Received /answer request")
         data = await request.json()
         user_answer = data.get("answer", "")
-        if hasattr(interpreter, 'provide_answer'):
-            output = interpreter.provide_answer(user_answer)
-            if output:
-                return {"result": output}
-            else:
-                return {"ask": interpreter.ask_prompt}
-        else:
-            return {"result": "[ERROR] Input handling not available."}
+        output = interpreter.provide_answer(user_answer)
+        if interpreter.awaiting_input:
+            return {"ask": interpreter.ask_prompt}
+        return {"result": output}
     except Exception as e:
         print(f"[ERROR] in /answer: {e}")
         return {"result": f"[ERROR] Backend crashed: {str(e)}"}
