@@ -245,21 +245,21 @@ class StructuredJargonInterpreter:
                 break
 
     def safe_eval(self, expr):
-    expr = expr.strip()
-    try:
-        tokens = re.findall(r'\b\w+\b', expr)
-        for token in tokens:
-            if token in self.memory and isinstance(self.memory[token], str):
-                expr = re.sub(rf'\b{token}\b', f'"{self.memory[token]}"', expr)
-        code = compile(expr, "<string>", "eval")
-        return eval(code, {"__builtins__": None}, {
-            "int": int, "abs": abs, "min": min, "max": max,
-            "float": float, "round": round, "list": list, "str": str, "bool": bool,
-            **self.memory
-        })
-    except Exception as e:
-        self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
-        return None
+        expr = expr.strip()
+        try:
+            tokens = re.findall(r'\b\w+\b', expr)
+            for token in tokens:
+                if token in self.memory and isinstance(self.memory[token], str):
+                    expr = re.sub(rf'\b{token}\b', f'"{self.memory[token]}"', expr)
+            code = compile(expr, "<string>", "eval")
+            return eval(code, {"__builtins__": None}, {
+                "int": int, "abs": abs, "min": min, "max": max,
+                "float": float, "round": round, "list": list, "str": str, "bool": bool,
+                **self.memory
+            })
+        except Exception as e:
+            self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
+            return None
 
     def evaluate_condition(self, text: str) -> bool:
         try:
