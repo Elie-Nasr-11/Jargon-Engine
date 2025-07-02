@@ -270,7 +270,7 @@ class StructuredJargonInterpreter:
                 parts = text.split("OR")
                 return any(self.evaluate_condition(p.strip()) for p in parts)
     
-            replacements = [
+            comparisons = [
                 ("is equal to", lambda a, b: a == b),
                 ("is not equal to", lambda a, b: a != b),
                 ("is greater than or equal to", lambda a, b: a >= b),
@@ -280,12 +280,12 @@ class StructuredJargonInterpreter:
                 ("is in", lambda a, b: a in b)
             ]
     
-            for phrase, func in replacements:
+            for phrase, func in comparisons:
                 if phrase in text:
-                    a, b = text.split(phrase)
-                    left = self.safe_eval(a.strip())
-                    right = self.safe_eval(b.strip())
-                    return func(left, right)
+                    left_text, right_text = text.split(phrase)
+                    left_val = self.safe_eval(left_text.strip())
+                    right_val = self.safe_eval(right_text.strip())
+                    return func(left_val, right_val)
     
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
@@ -299,6 +299,7 @@ class StructuredJargonInterpreter:
     
             self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
             return False
+    
         except Exception as e:
             self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
             return False
