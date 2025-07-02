@@ -262,44 +262,46 @@ class StructuredJargonInterpreter:
             return None
 
     def evaluate_condition(self, text: str) -> bool:
-        try:
-            if "AND" in text:
-                parts = text.split("AND")
-                return all(self.evaluate_condition(p.strip()) for p in parts)
-            elif "OR" in text:
-                parts = text.split("OR")
-                return any(self.evaluate_condition(p.strip()) for p in parts)
-    
-            replacements = [
-                ("is equal to", "=="),
-                ("is not equal to", "!="),
-                ("is greater than or equal to", ">="),
-                ("is less than or equal to", "<="),
-                ("is greater than", ">"),
-                ("is less than", "<"),
-                ("is in", "in")
-            ]
-    
-            for phrase, symbol in replacements:
-                if phrase in text:
-                    a, b = text.split(phrase)
-                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
-    
-            if "is even" in text:
-                expr = text.split("is even")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 0
-            if "is odd" in text:
-                expr = text.split("is odd")[0].strip()
-                return self.safe_eval(f"({expr})") % 2 == 1
-            if "reaches end of" in text:
-                a, b = text.split("reaches end of")
-                return self.safe_eval(f"({a.strip()})") >= len(self.safe_eval(f"({b.strip()})"))
-    
-            self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
-            return False
-        except Exception as e:
-            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
-            return False
+    try:
+        if "AND" in text:
+            parts = text.split("AND")
+            return all(self.evaluate_condition(p.strip()) for p in parts)
+        elif "OR" in text:
+            parts = text.split("OR")
+            return any(self.evaluate_condition(p.strip()) for p in parts)
+
+        replacements = [
+            ("is equal to", lambda a, b: a == b),
+            ("is not equal to", lambda a, b: a != b),
+            ("is greater than or equal to", lambda a, b: a >= b),
+            ("is less than or equal to", lambda a, b: a <= b),
+            ("is greater than", lambda a, b: a > b),
+            ("is less than", lambda a, b: a < b),
+            ("is in", lambda a, b: a in b)
+        ]
+
+        for phrase, func in replacements:
+            if phrase in text:
+                a, b = text.split(phrase)
+                a_val = self.safe_eval(a.strip())
+                b_val = self.safe_eval(b.strip())
+                return func(a_val, b_val)
+
+        if "is even" in text:
+            expr = text.split("is even")[0].strip()
+            return self.safe_eval(expr) % 2 == 0
+        if "is odd" in text:
+            expr = text.split("is odd")[0].strip()
+            return self.safe_eval(expr) % 2 == 1
+        if "reaches end of" in text:
+            a, b = text.split("reaches end of")
+            return self.safe_eval(a.strip()) >= len(self.safe_eval(b.strip()))
+
+        self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
+        return False
+    except Exception as e:
+        self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
+        return False
 
     def get_output(self):
         return '\n'.join(str(x) for x in self.output_log)
