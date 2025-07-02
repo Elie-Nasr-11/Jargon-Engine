@@ -29,7 +29,16 @@ class StructuredJargonInterpreter:
         self.awaiting_input = False
         self.ask_prompt = ""
         self.memory[self.pending_stack[-1]] = user_input
-        self.execute_block(self.pending_block, self.pending_index)
+        if self.pending_index == -999:
+            first_line = self.pending_block[0]
+            if first_line.startswith("REPEAT_UNTIL"):
+                self.handle_repeat_until(self.pending_block)
+            elif first_line.startswith("REPEAT "):
+                self.handle_repeat_n_times(self.pending_block)
+            elif first_line.startswith("REPEAT_FOR_EACH"):
+                self.handle_repeat_for_each(self.pending_block)
+        else:
+            self.execute_block(self.pending_block, self.pending_index)
 
     def execute_block(self, block, start=0):
         i = start
@@ -192,7 +201,8 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = lambda: self.handle_repeat_until(block)
+                self.pending_block = block
+                self.pending_index = -999
                 return
             if self.break_loop:
                 break
@@ -211,7 +221,8 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = lambda: self.handle_repeat_n_times(block)
+                self.pending_block = block
+                self.pending_index = -999
                 return
             if self.break_loop:
                 break
@@ -227,7 +238,8 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.execute_block(block[1:-1])
             if self.awaiting_input:
-                self.pending_block = lambda: self.handle_repeat_for_each(block)
+                self.pending_block = block
+                self.pending_index = -999
                 return
             if self.break_loop:
                 break
@@ -280,11 +292,7 @@ class StructuredJargonInterpreter:
                 return self.safe_eval(a) in self.safe_eval(b)
             elif "reaches end of" in text:
                 a, b = text.split("reaches end of")
-                right = self.safe_eval(b)
-                if not hasattr(right, "__len__"):
-                    self.output_log.append(f"[ERROR] '{b.strip()}' is not a sequence — cannot use 'reaches end of'")
-                    return False
-                return self.safe_eval(a) >= len(right)
+                return self.safe_eval(a) >= len(self.safe_eval(b))
             else:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
