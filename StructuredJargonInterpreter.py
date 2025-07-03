@@ -3,6 +3,7 @@ from AskException import AskException
 
 class StructuredJargonInterpreter:
     def __init__(self):
+        self.resume_index = None
         self.max_steps = 1000
         self.break_loop = False
         self.pending_ask = None
@@ -15,7 +16,9 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
         self.loop_active = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        self.execute_block(self.lines)
+        start_index = self.resume_index or 0
+        self.resume_index = None
+        self.execute_block(self.lines[start_index:]) 
         return {
             "output": '\n'.join(self.output_log),
             "memory": self.memory
@@ -25,6 +28,7 @@ class StructuredJargonInterpreter:
         i = 0
         steps = 0
         while i < len(block):
+            self.current_index = i
             line = block[i]
             steps += 1
             if steps > self.max_steps:
@@ -145,10 +149,12 @@ class StructuredJargonInterpreter:
         question, var = match.groups()
     
         if self.loop_active:
+            self.resume_index = self.current_index + 1 
             self.pending_ask = AskException(question, var)
             return
     
         if var not in self.memory or self.memory[var] in [None, ""]:
+            self.resume_index = self.current_index + 1 
             self.pending_ask = AskException(question, var)
 
     def handle_if_else(self, block):
