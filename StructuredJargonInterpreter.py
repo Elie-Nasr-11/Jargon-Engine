@@ -115,10 +115,6 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
-        if var in self.memory and self.memory[var] not in [None, ""]:
-            return
-    
         self.pending_ask = AskException(question, var)
 
     def handle_remove(self, line):
