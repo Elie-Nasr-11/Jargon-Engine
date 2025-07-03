@@ -213,10 +213,39 @@ class StructuredJargonInterpreter:
         self.resume(user_input)
         return self.get_output()
 
-code = """
 
+
+code = """
+SET correct ("Bob")
+SET got_it ("False")
+REPEAT_UNTIL got_it is equal to "True"
+  ASK "Enter name:" as name
+  IF name is equal to correct THEN
+    PRINT "Match!"
+    SET got_it ("True")
+  ELSE
+    PRINT "No match"
+  END
+END
+PRINT "Done!"
 """
 
 interpreter = StructuredJargonInterpreter()
 interpreter.run(code)
+print(interpreter.ask_prompt)  # shows first prompt
 print(interpreter.get_output())
+
+interpreter.provide_answer("Hi")
+print(interpreter.ask_prompt)
+print(interpreter.get_output())
+
+interpreter.provide_answer("Bob")
+print(interpreter.get_output())
+
+#code = """
+
+#"""
+
+#interpreter = StructuredJargonInterpreter()
+#interpreter.run(code)
+#print(interpreter.get_output())
