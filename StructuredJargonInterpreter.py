@@ -11,7 +11,6 @@ class StructuredJargonInterpreter:
         self.pending_block = None
         self.pending_index = 0
         self.pending_stack = []
-        self.resume_mode = None  # "normal" or "loop"
 
     def run(self, code: str):
         self.memory.clear()
@@ -22,36 +21,21 @@ class StructuredJargonInterpreter:
         self.pending_block = None
         self.pending_index = 0
         self.pending_stack = []
-        self.resume_mode = None
-
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
 
     def resume(self, user_input: str):
-        if not self.awaiting_input:
-            self.output_log.append("[ERROR] No input was expected.")
+        if not self.pending_stack:
+            self.output_log.append("[ERROR] No variable to assign input to.")
             return
-        if not self.pending_stack or self.pending_block is None:
+        if not self.pending_block:
             self.output_log.append("[ERROR] No pending block to resume.")
             return
-
         var = self.pending_stack.pop()
-        self.memory[var] = user_input
+        self.memory[var] = str(user_input)  # always store input as string
         self.awaiting_input = False
         self.ask_prompt = ""
-
-        if self.resume_mode == "loop":
-            # Resume REPEAT_UNTIL from beginning of loop
-            loop_header = self.pending_block[0]
-            if loop_header.startswith("REPEAT_UNTIL"):
-                self.handle_repeat_until(self.pending_block)
-            elif loop_header.startswith("REPEAT "):
-                self.handle_repeat_n_times(self.pending_block)
-            elif loop_header.startswith("REPEAT_FOR_EACH"):
-                self.handle_repeat_for_each(self.pending_block)
-        else:
-            # Normal resume
-            self.execute_block(self.pending_block, self.pending_index)
+        self.execute_block(self.pending_block, self.pending_index)
 
     def execute_block(self, block, start=0):
         i = start
@@ -60,7 +44,6 @@ class StructuredJargonInterpreter:
             if self.awaiting_input:
                 self.pending_block = block
                 self.pending_index = i
-                self.resume_mode = "normal"
                 return
             line = block[i]
             steps += 1
@@ -82,9 +65,6 @@ class StructuredJargonInterpreter:
                 self.handle_remove(line)
             elif line.startswith("ASK "):
                 if self.handle_ask(line):
-                    self.pending_block = block
-                    self.pending_index = i + 1
-                    self.resume_mode = "normal"
                     return
             elif line.startswith("IF "):
                 sub_block, jump_to = self.collect_block(block, i, "END")
@@ -219,7 +199,7 @@ class StructuredJargonInterpreter:
             self.execute_block(block[1:-1])
             if self.awaiting_input:
                 self.pending_block = block
-                self.resume_mode = "loop"
+                self.pending_index = 0
                 return
             if self.break_loop:
                 break
@@ -239,7 +219,7 @@ class StructuredJargonInterpreter:
             self.execute_block(block[1:-1])
             if self.awaiting_input:
                 self.pending_block = block
-                self.resume_mode = "loop"
+                self.pending_index = 0
                 return
             if self.break_loop:
                 break
@@ -256,7 +236,7 @@ class StructuredJargonInterpreter:
             self.execute_block(block[1:-1])
             if self.awaiting_input:
                 self.pending_block = block
-                self.resume_mode = "loop"
+                self.pending_index = 0
                 return
             if self.break_loop:
                 break
@@ -264,16 +244,13 @@ class StructuredJargonInterpreter:
     def safe_eval(self, expr):
         expr = expr.strip()
         try:
-            tokens = re.findall(r'\b\w+\b', expr)
-            for token in tokens:
-                if token in self.memory and isinstance(self.memory[token], str):
-                    expr = re.sub(rf'\b{token}\b', f'"{self.memory[token]}"', expr)
-            code = compile(expr, "<string>", "eval")
-            return eval(code, {"__builtins__": None}, {
-                "int": int, "abs": abs, "min": min, "max": max,
-                "float": float, "round": round, "list": list, "str": str, "bool": bool,
-                **self.memory
-            })
+            for key in sorted(self.memory.keys(), key=len, reverse=True):
+                val = self.memory[key]
+                if isinstance(val, str):
+                    expr = re.sub(rf'\b{key}\b', f'"{val}"', expr)
+                else:
+                    expr = re.sub(rf'\b{key}\b', str(val), expr)
+            return eval(expr, {"__builtins__": {}}, {})
         except Exception as e:
             self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
             return None
@@ -300,7 +277,7 @@ class StructuredJargonInterpreter:
             for phrase, symbol in replacements:
                 if phrase in text:
                     a, b = text.split(phrase)
-                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})")
+                    return self.safe_eval(f"({a.strip()}) {symbol} ({b.strip()})") is True
 
             if "is even" in text:
                 expr = text.split("is even")[0].strip()
@@ -323,7 +300,7 @@ class StructuredJargonInterpreter:
 
     def provide_answer(self, user_input: str):
         if not self.awaiting_input:
-            return "[ERROR] No input expected."
+            return "[ERROR] Not awaiting input."
         self.resume(user_input)
         return self.get_output()
 
