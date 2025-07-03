@@ -260,11 +260,3 @@ class StructuredJargonInterpreter:
         except Exception as e:
             self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
             return False
-
-code = """
-
-"""
-
-interpreter = StructuredJargonInterpreter()
-interpreter.run(code)
-print(interpreter.get_output())
