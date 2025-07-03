@@ -136,12 +136,10 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        
-        if var in self.memory:
-            return
     
+      
         raise AskException(question, var)
-
+  
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
