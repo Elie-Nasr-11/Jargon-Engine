@@ -1,18 +1,21 @@
 import re
+from AskException import AskException
 
 class StructuredJargonInterpreter:
     def __init__(self):
-        self.memory = {}
-        self.output_log = []
         self.max_steps = 1000
         self.break_loop = False
 
-    def run(self, code: str):
-        self.memory.clear()
-        self.output_log.clear()
+    def run(self, code: str, memory: dict):
+        self.memory = memory.copy()
+        self.output_log = []
         self.break_loop = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
+        return {
+            "output": '\n'.join(self.output_log),
+            "memory": self.memory
+        }
 
     def execute_block(self, block):
         i = 0
@@ -133,7 +136,7 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        self.memory[var] = input(question + " ")
+        raise AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
@@ -257,9 +260,6 @@ class StructuredJargonInterpreter:
         except Exception as e:
             self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
             return False
-
-    def get_output(self):
-        return '\n'.join(str(x) for x in self.output_log)
 
 code = """
 
