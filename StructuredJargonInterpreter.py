@@ -144,14 +144,12 @@ class StructuredJargonInterpreter:
             return
         question, var = match.groups()
     
-        if var in self.memory and self.memory[var] not in [None, ""]:
-            return 
-            
         if self.loop_active:
             self.pending_ask = AskException(question, var)
             return
     
-        self.pending_ask = AskException(question, var)
+        if var not in self.memory or self.memory[var] in [None, ""]:
+            self.pending_ask = AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
