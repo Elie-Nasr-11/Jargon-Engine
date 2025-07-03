@@ -137,7 +137,6 @@ class StructuredJargonInterpreter:
             return
         question, var = match.groups()
     
-      
         raise AskException(question, var)
   
     def handle_if_else(self, block):
