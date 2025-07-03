@@ -109,16 +109,16 @@ class StructuredJargonInterpreter:
         val = self.safe_eval(expr)
         self.output_log.append(str(val))
 
-    def handle_add(self, line):
-        match = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
-        if not match:
-            self.output_log.append(f"[ERROR] Invalid ADD syntax: {line}")
-            return
-        value_expr, list_name = match.groups()
-        value = self.safe_eval(value_expr)
-        if list_name not in self.memory or not isinstance(self.memory[list_name], list):
-            self.memory[list_name] = []
-        self.memory[list_name].append(value)
+    def handle_ask(self, line):
+    match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+    if not match:
+        self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+        return
+    question, var = match.groups()
+    if var in self.memory:
+        return
+
+    self.pending_ask = AskException(question, var)
 
     def handle_remove(self, line):
         match = re.match(r'REMOVE\s+(.+?)\s+from\s+(\w+)', line)
