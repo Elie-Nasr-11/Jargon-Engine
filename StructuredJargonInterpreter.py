@@ -16,14 +16,19 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
         self.loop_active = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        start_index = self.resume_index or 0
-        self.resume_index = None
-        self.execute_block(self.lines[start_index:]) 
+        
+        try:
+            start_index = self.resume_index or 0
+            self.resume_index = None
+            self.execute_block(self.lines[start_index:])
+        except AskException as e:
+            raise e
+    
         return {
             "output": '\n'.join(self.output_log),
             "memory": self.memory
         }
-
+    
     def execute_block(self, block):
         i = 0
         steps = 0
@@ -36,10 +41,12 @@ class StructuredJargonInterpreter:
                 break
             if self.break_loop:
                 break
+    
+            # Main dispatcher
             if line == "BREAK":
                 self.break_loop = True
                 break
-            if line.startswith("SET "):
+            elif line.startswith("SET "):
                 self.handle_set(line)
             elif line.startswith("PRINT "):
                 self.handle_print(line)
@@ -67,11 +74,14 @@ class StructuredJargonInterpreter:
                 i = jump_to - 1
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
+            
+            if self.pending_ask:
+                self.resume_index = self.current_index
+                raise self.pending_ask
+    
             i += 1
 
-            if self.pending_ask:
-                raise self.pending_ask
-
+    
     def collect_block(self, lines, start, end_keyword):
         block = [lines[start]]
         i = start + 1
