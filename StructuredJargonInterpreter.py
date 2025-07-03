@@ -181,51 +181,63 @@ class StructuredJargonInterpreter:
             self.execute_block(false_block)
 
     def handle_repeat_until(self, block):
+        self.loop_active = True
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
         count = 0
-        self.loop_active = True
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
-            self.execute_block(block[1:-1])
+            try:
+                self.execute_block(block[1:-1])
+            except AskException as e:
+                self.loop_active = False
+                raise e
+            self.loop_active = False
             if self.break_loop:
                 break
             count += 1
             if count > self.max_steps:
                 self.output_log.append("[ERROR] Loop exceeded max iterations.")
                 break
-        self.loop_active = False
     
     
     def handle_repeat_n_times(self, block):
+        self.loop_active = True
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         times = int(match.group(1))
-        self.loop_active = True
         for _ in range(times):
             self.break_loop = False
-            self.execute_block(block[1:-1])
+            try:
+                self.execute_block(block[1:-1])
+            except AskException as e:
+                self.loop_active = False
+                raise e
+            self.loop_active = False
             if self.break_loop:
                 break
-        self.loop_active = False
     
     
     def handle_repeat_for_each(self, block):
+        self.loop_active = True
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
         var, iterable = match.groups()
-        self.loop_active = True
         for item in self.memory.get(iterable, []):
             self.memory[var] = item
             self.break_loop = False
-            self.execute_block(block[1:-1])
+            try:
+                self.execute_block(block[1:-1])
+            except AskException as e:
+                self.loop_active = False
+                raise e
+            self.loop_active = False
             if self.break_loop:
                 break
-        self.loop_active = False
-
+                
     def safe_eval(self, expr):
         expr = expr.strip()
         try:
