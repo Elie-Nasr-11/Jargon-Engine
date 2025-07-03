@@ -109,13 +109,14 @@ class StructuredJargonInterpreter:
         val = self.safe_eval(expr)
         self.output_log.append(str(val))
 
-    def handle_ask(self, line):
+        def handle_ask(self, line):
         match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
         if not match:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        if var in self.memory:
+    
+        if var in self.memory and self.memory[var] != "":
             return
     
         self.pending_ask = AskException(question, var)
