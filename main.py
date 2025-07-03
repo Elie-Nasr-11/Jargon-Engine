@@ -8,7 +8,7 @@ interpreter = StructuredJargonInterpreter()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for now; restrict in prod
+    allow_origins=["*"],  # For dev; restrict in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,5 +30,6 @@ async def run_code(req: Request):
         return {
             "ask": ask.prompt,
             "ask_var": ask.variable,
-            "result": '\n'.join(interpreter.output_log)  # ✅ flush full text
+            "result": interpreter.output_log,  # This can stay as-is
+            "memory": interpreter.memory        # So frontend continues state
         }
