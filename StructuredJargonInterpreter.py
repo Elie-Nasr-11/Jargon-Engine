@@ -3,32 +3,24 @@ from AskException import AskException
 
 class StructuredJargonInterpreter:
     def __init__(self):
-        self.resume_index = None
+        self.resume_index_stack = []
         self.max_steps = 1000
         self.break_loop = False
         self.pending_ask = None
-        self.loop_active = False
 
     def run(self, code: str, memory: dict):
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
-        self.loop_active = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        
-        try:
-            start_index = self.resume_index or 0
-            self.resume_index = None
-            self.execute_block(self.lines[start_index:])
-        except AskException as e:
-            raise e
-    
+        self.resume_index_stack = []
+        self.execute_block(self.lines)
         return {
             "output": '\n'.join(self.output_log),
             "memory": self.memory
         }
-    
+
     def execute_block(self, block):
         i = 0
         steps = 0
@@ -41,8 +33,7 @@ class StructuredJargonInterpreter:
                 break
             if self.break_loop:
                 break
-    
-            # Main dispatcher
+
             if line == "BREAK":
                 self.break_loop = True
                 break
@@ -74,14 +65,11 @@ class StructuredJargonInterpreter:
                 i = jump_to - 1
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
-            
-            if self.pending_ask:
-                self.resume_index = self.current_index
-                raise self.pending_ask
-    
             i += 1
 
-    
+            if self.pending_ask:
+                raise self.pending_ask
+
     def collect_block(self, lines, start, end_keyword):
         block = [lines[start]]
         i = start + 1
@@ -157,14 +145,12 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
-        if self.loop_active:
-            self.resume_index = self.current_index + 1 
-            self.pending_ask = AskException(question, var)
-            return
-    
+
         if var not in self.memory or self.memory[var] in [None, ""]:
-            self.resume_index = self.current_index + 1 
+            # If we're inside a loop, store current resume context
+            if self.resume_index_stack:
+                context = self.resume_index_stack[-1]
+                context["pending_line"] = self.current_index + 1
             self.pending_ask = AskException(question, var)
 
     def handle_if_else(self, block):
@@ -197,63 +183,77 @@ class StructuredJargonInterpreter:
             self.execute_block(false_block)
 
     def handle_repeat_until(self, block):
-        self.loop_active = True
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
+        context = {"type": "until", "block": block, "pending_line": 1}
+        self.resume_index_stack.append(context)
+
         count = 0
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
             try:
-                self.execute_block(block[1:-1])
+                self.execute_block(block[context["pending_line"]:-1])
+                context["pending_line"] = 1  # reset after full block execution
             except AskException as e:
-                self.loop_active = False
                 raise e
-            self.loop_active = False
             if self.break_loop:
                 break
             count += 1
             if count > self.max_steps:
                 self.output_log.append("[ERROR] Loop exceeded max iterations.")
                 break
-    
-    
+
+        self.resume_index_stack.pop()
+
     def handle_repeat_n_times(self, block):
-        self.loop_active = True
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         times = int(match.group(1))
-        for _ in range(times):
+        context = {"type": "times", "block": block, "index": 0, "pending_line": 1}
+        self.resume_index_stack.append(context)
+
+        while context["index"] < times:
             self.break_loop = False
             try:
-                self.execute_block(block[1:-1])
+                self.execute_block(block[context["pending_line"]:-1])
+                context["pending_line"] = 1
             except AskException as e:
-                self.loop_active = False
                 raise e
-            self.loop_active = False
+            context["index"] += 1
             if self.break_loop:
                 break
-    
-    
+
+        self.resume_index_stack.pop()
+
     def handle_repeat_for_each(self, block):
-        self.loop_active = True
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
         var, iterable = match.groups()
-        for item in self.memory.get(iterable, []):
-            self.memory[var] = item
+        items = self.memory.get(iterable, [])
+        if not isinstance(items, list):
+            self.output_log.append(f"[ERROR] {iterable} is not a list")
+            return
+
+        context = {"type": "foreach", "block": block, "index": 0, "pending_line": 1, "var": var, "items": items}
+        self.resume_index_stack.append(context)
+
+        while context["index"] < len(items):
+            self.memory[var] = items[context["index"]]
             self.break_loop = False
             try:
-                self.execute_block(block[1:-1])
+                self.execute_block(block[context["pending_line"]:-1])
+                context["pending_line"] = 1
             except AskException as e:
-                self.loop_active = False
                 raise e
-            self.loop_active = False
+            context["index"] += 1
             if self.break_loop:
                 break
-                
+
+        self.resume_index_stack.pop()
+
     def safe_eval(self, expr):
         expr = expr.strip()
         try:
