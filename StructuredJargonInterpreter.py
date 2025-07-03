@@ -6,12 +6,14 @@ class StructuredJargonInterpreter:
         self.max_steps = 1000
         self.break_loop = False
         self.pending_ask = None
+        self.loop_active = False
 
     def run(self, code: str, memory: dict):
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
+        self.loop_active = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
         return {
@@ -109,18 +111,16 @@ class StructuredJargonInterpreter:
         val = self.safe_eval(expr)
         self.output_log.append(str(val))
 
-    def handle_ask(self, line):
-        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+    def handle_add(self, line):
+        match = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
         if not match:
-            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+            self.output_log.append(f"[ERROR] Invalid ADD syntax: {line}")
             return
-        question, var = match.groups()
-    
-        if var in self.memory and self.memory[var] not in [None, ""]:
-            return
-    
-        self.pending_ask = AskException(question, var)
-
+        value_expr, list_name = match.groups()
+        value = self.safe_eval(value_expr)
+        if list_name not in self.memory or not isinstance(self.memory[list_name], list):
+            self.memory[list_name] = []
+        self.memory[list_name].append(value)
 
     def handle_remove(self, line):
         match = re.match(r'REMOVE\s+(.+?)\s+from\s+(\w+)', line)
@@ -136,6 +136,20 @@ class StructuredJargonInterpreter:
                 self.output_log.append(f"[ERROR] Value {value} not found in {list_name}")
         else:
             self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
+
+    def handle_ask(self, line):
+        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+        if not match:
+            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+            return
+        question, var = match.groups()
+
+        if self.loop_active:
+            self.pending_ask = AskException(question, var)
+            return
+            
+        if var not in self.memory or self.memory[var] in [None, ""]:
+            self.pending_ask = AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
@@ -171,7 +185,9 @@ class StructuredJargonInterpreter:
         count = 0
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
+            self.loop_active = True
             self.execute_block(block[1:-1])
+            self.loop_active = False
             if self.break_loop:
                 break
             count += 1
@@ -187,7 +203,9 @@ class StructuredJargonInterpreter:
         times = int(match.group(1))
         for _ in range(times):
             self.break_loop = False
+            self.loop_active = True
             self.execute_block(block[1:-1])
+            self.loop_active = False
             if self.break_loop:
                 break
 
@@ -200,7 +218,9 @@ class StructuredJargonInterpreter:
         for item in self.memory.get(iterable, []):
             self.memory[var] = item
             self.break_loop = False
+            self.loop_active = True
             self.execute_block(block[1:-1])
+            self.loop_active = False
             if self.break_loop:
                 break
 
