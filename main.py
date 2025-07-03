@@ -7,7 +7,7 @@ interpreter = StructuredJargonInterpreter()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Adjust for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -16,13 +16,6 @@ app.add_middleware(
 @app.post("/run")
 async def run_code(req: Request):
     data = await req.json()
-    code = data["input"]
-    result, ask_prompt = interpreter.run(code)
-    return {"result": result, "ask": ask_prompt}
-
-@app.post("/answer")
-async def handle_answer(req: Request):
-    data = await req.json()
-    answer = data["answer"]
-    result, ask_prompt = interpreter.resume(answer)
-    return {"result": result, "ask": ask_prompt}
+    code = data.get("input", "")
+    interpreter.run(code)
+    return {"result": interpreter.get_output()}
