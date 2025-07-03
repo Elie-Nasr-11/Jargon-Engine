@@ -138,18 +138,20 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
 
     def handle_ask(self, line):
-        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-        if not match:
-            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
-            return
-        question, var = match.groups()
+    match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+    if not match:
+        self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+        return
+    question, var = match.groups()
 
-        if self.loop_active:
-            self.pending_ask = AskException(question, var)
-            return
-            
-        if var not in self.memory or self.memory[var] in [None, ""]:
-            self.pending_ask = AskException(question, var)
+    if var in self.memory and self.memory[var] not in [None, ""]:
+        return 
+        
+    if self.loop_active:
+        self.pending_ask = AskException(question, var)
+        return
+
+    self.pending_ask = AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
@@ -183,46 +185,48 @@ class StructuredJargonInterpreter:
     def handle_repeat_until(self, block):
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
         count = 0
+        self.loop_active = True
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
-            self.loop_active = True
             self.execute_block(block[1:-1])
-            self.loop_active = False
             if self.break_loop:
                 break
             count += 1
             if count > self.max_steps:
                 self.output_log.append("[ERROR] Loop exceeded max iterations.")
                 break
-
+        self.loop_active = False
+    
+    
     def handle_repeat_n_times(self, block):
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         times = int(match.group(1))
+        self.loop_active = True
         for _ in range(times):
             self.break_loop = False
-            self.loop_active = True
             self.execute_block(block[1:-1])
-            self.loop_active = False
             if self.break_loop:
                 break
-
+        self.loop_active = False
+    
+    
     def handle_repeat_for_each(self, block):
         match = re.match(r'REPEAT_FOR_EACH\s+(\w+)\s+in\s+(\w+)', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
         var, iterable = match.groups()
+        self.loop_active = True
         for item in self.memory.get(iterable, []):
             self.memory[var] = item
             self.break_loop = False
-            self.loop_active = True
             self.execute_block(block[1:-1])
-            self.loop_active = False
             if self.break_loop:
                 break
+        self.loop_active = False
 
     def safe_eval(self, expr):
         expr = expr.strip()
