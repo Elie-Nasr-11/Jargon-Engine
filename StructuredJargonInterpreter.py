@@ -147,7 +147,6 @@ class StructuredJargonInterpreter:
         question, var = match.groups()
 
         if var not in self.memory or self.memory[var] in [None, ""]:
-            # If we're inside a loop, store current resume context
             if self.resume_index_stack:
                 context = self.resume_index_stack[-1]
                 context["pending_line"] = self.current_index + 1
@@ -192,7 +191,7 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             try:
                 self.execute_block(block[context["pending_line"]:-1])
-                context["pending_line"] = 1  # reset after full block execution
+                context["pending_line"] = 1
             except AskException as e:
                 raise e
             if self.break_loop:
