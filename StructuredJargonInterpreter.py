@@ -5,11 +5,13 @@ class StructuredJargonInterpreter:
     def __init__(self):
         self.max_steps = 1000
         self.break_loop = False
+        self.pending_ask = None
 
     def run(self, code: str, memory: dict):
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
+        self.pending_ask = None
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
         return {
@@ -60,6 +62,9 @@ class StructuredJargonInterpreter:
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
             i += 1
+
+            if self.pending_ask:
+                raise self.pending_ask
 
     def collect_block(self, lines, start, end_keyword):
         block = [lines[start]]
@@ -136,9 +141,8 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
-        raise AskException(question, var)
-  
+        self.pending_ask = AskException(question, var)
+
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
