@@ -30,5 +30,5 @@ async def run_code(req: Request):
         return {
             "ask": ask.prompt,
             "ask_var": ask.variable,
-            "result": interpreter.output_log  # show what printed before the ASK
+            "result": '\n'.join(interpreter.output_log)  # ✅ flush full text
         }
