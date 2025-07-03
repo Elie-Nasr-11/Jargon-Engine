@@ -15,6 +15,9 @@ class StructuredJargonInterpreter:
             self.index += 1
         return "\n".join(self.output_log)
 
+    def get_output(self):
+        return "\n".join(self.output_log)
+
     def execute_line(self, line: str):
         if not line or line.startswith("#"):
             return
@@ -112,6 +115,7 @@ class StructuredJargonInterpreter:
 
     def evaluate_condition(self, condition: str):
         return bool(self.safe_eval(condition))
+
 
 code = """
 
