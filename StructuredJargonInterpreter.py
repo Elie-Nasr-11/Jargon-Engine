@@ -23,6 +23,9 @@ class StructuredJargonInterpreter:
         else:
             self.execute_block(self.lines)
     
+        if self.pending_ask:
+            raise self.pending_ask
+    
         return {
             "output": self.output_log,
             "memory": self.memory
