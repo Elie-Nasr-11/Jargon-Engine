@@ -264,7 +264,6 @@ class StructuredJargonInterpreter:
         self._resume_repeat_until(self.resume_context)
 
     def _resume_repeat_until(self, ctx):
-        def _resume_repeat_until(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
         condition = ctx["condition"]
