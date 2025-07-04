@@ -9,6 +9,7 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.pending_ask = None
         self.resume_context = None
+        self.resume_state = None
         self.max_steps = 1000
         self.break_loop = False
 
@@ -22,6 +23,10 @@ class StructuredJargonInterpreter:
 
         if self.resume_context:
             self.resume_loop()
+        elif self.resume_state:
+            i = self.resume_state["index"] + 1
+            self.resume_state = None
+            self.execute_block(self.lines[i:])
         else:
             self.execute_block(self.lines)
 
@@ -37,12 +42,10 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
+        self.resume_context = None
+        self.resume_state = None
 
-        if self.resume_context:
-            self.resume_loop()
-        else:
-            self.resume_context = None
-            self.execute_block(self.lines)
+        self.execute_block(self.lines)
 
         return {
             "output": self.output_log,
@@ -85,6 +88,10 @@ class StructuredJargonInterpreter:
             elif line.startswith("REMOVE "):
                 self.handle_remove(line)
             elif line.startswith("ASK "):
+                self.resume_state = {
+                    "lines": block,
+                    "index": i
+                }
                 self.handle_ask(line)
             elif line.startswith("IF "):
                 sub_block, jump_to = self.collect_block(block, i, "END")
@@ -183,7 +190,6 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
         value = self.memory.get(var, None)
         if value is None or (isinstance(value, str) and value.strip() == ""):
             self.pending_ask = AskException(question, var)
