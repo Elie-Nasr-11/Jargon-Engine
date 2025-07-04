@@ -11,6 +11,7 @@ class StructuredJargonInterpreter:
         self.current_line_index = 0
         self.max_steps = 1000
         self.break_loop = False
+        self.loop_stack = []
 
     def run(self, code: str, memory: dict):
         self.code = code
@@ -245,13 +246,21 @@ class StructuredJargonInterpreter:
 
     def handle_repeat_until(self, block):
         condition = block[0].replace("REPEAT_UNTIL", "").strip()
+        start_index = 0
+    
+        if self.loop_stack and self.loop_stack[-1][0] == "REPEAT_UNTIL":
+            _, saved_block = self.loop_stack.pop()
+            if saved_block == block:
+                pass
+    
         while not self.evaluate_condition(condition):
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
+                self.loop_stack.append(("REPEAT_UNTIL", block))
                 raise e
             if self.pending_ask:
-                return 
+                return
             if self.break_loop:
                 self.break_loop = False
                 break
@@ -261,19 +270,28 @@ class StructuredJargonInterpreter:
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
+    
         var, iterable = match.groups()
         items = self.memory.get(iterable, [])
         if not isinstance(items, list):
             self.output_log.append(f"[ERROR] {iterable} is not a list")
             return
-        for item in items:
-            self.memory[var] = item
+    
+        start_index = 0
+        if self.loop_stack and self.loop_stack[-1][0] == "REPEAT_FOR_EACH":
+            _, saved_block, saved_index = self.loop_stack.pop()
+            if saved_block == block:
+                start_index = saved_index + 1
+    
+        for i in range(start_index, len(items)):
+            self.memory[var] = items[i]
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
+                self.loop_stack.append(("REPEAT_FOR_EACH", block, i))
                 raise e
             if self.pending_ask:
-                return 
+                return
             if self.break_loop:
                 self.break_loop = False
                 break
