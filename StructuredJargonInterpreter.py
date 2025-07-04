@@ -38,34 +38,36 @@ class StructuredJargonInterpreter:
     def resume(self, code: str, memory: dict):
         self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        self.memory.update(memory)
+        self.memory = memory.copy()
         self.output_log = []
         self.pending_ask = None
         self.break_loop = False
-    
+
         try:
             if self.loop_stack:
-                loop_type, block, i, count = self.loop_stack.pop()
+                loop_type, block, i, count = self.loop_stack[-1]
                 for j in range(i + 1, count):
-                    self.loop_stack.append((loop_type, block, j, count))
-                    self.execute_block(block[1:-1]) 
-                    self.loop_stack.pop()
+                    self.loop_stack[-1] = (loop_type, block, j, count)
+                    self.execute_block(block[1:-1])
                     if self.pending_ask:
-                        raise self.pending_ask
+                        return {
+                            "output": self.output_log,
+                            "memory": self.memory
+                        }
                     if self.break_loop:
                         self.break_loop = False
                         break
+                self.loop_stack.pop()
                 return {
                     "output": self.output_log,
                     "memory": self.memory
                 }
-    
-            self.current_line_index = self.resume_line_index
+
             self.execute()
-    
+
         except AskException as e:
             self.pending_ask = e
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
