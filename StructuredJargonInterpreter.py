@@ -23,8 +23,8 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
     
         if self.resume_context:
-            self.resume_loop()
-        elif self.resume_state: 
+            return self.resume_loop()
+        elif self.resume_state:
             i = self.resume_state["index"]
             self.resume_state = None
             self.execute_block(self.lines[i:])
