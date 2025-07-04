@@ -28,6 +28,10 @@ async def run_code(req: Request):
         code = data.get("code", "")
         memory = data.get("memory", {})
 
+        # Reset interpreter states before a fresh run
+        interpreter.resume_context = None
+        interpreter.resume_state = None
+
         result = interpreter.run(code, memory)
         return {
             "result": result["output"],
@@ -56,7 +60,7 @@ async def resume_code(req: Request):
         code = data.get("code", "")
         memory = data.get("memory", {})
 
-        # Set value in memory and resume
+        # Set value and continue
         memory[var] = value
         result = interpreter.resume(code, memory)
 
