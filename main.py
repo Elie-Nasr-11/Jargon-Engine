@@ -74,10 +74,7 @@ async def resume_code(req: Request):
 
         # Set value and continue
         memory[var] = value
-        interpreter.memory = memory
-        interpreter.code = code
-        interpreter.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        result = interpreter.resume(code, interpreter.memory)
+        result = interpreter.resume(code, memory)
 
         return {
             "result": result["output"],
