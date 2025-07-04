@@ -12,6 +12,7 @@ class StructuredJargonInterpreter:
         self.max_steps = 1000
         self.break_loop = False
         self.loop_stack = []
+        self.resume_line_index = 0
 
     def run(self, code: str, memory: dict):
         self.code = code
@@ -21,6 +22,8 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
         self.current_line_index = 0
         self.break_loop = False
+        self.resume_line_index = 0
+        self.loop_stack = []
 
         try:
             self.execute()
@@ -39,28 +42,29 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.pending_ask = None
         self.break_loop = False
-    
+
         try:
             if self.loop_stack:
                 loop_type, block, i, count = self.loop_stack.pop()
-                if loop_type == "REPEAT":
-                    for j in range(i + 1, count):
-                        self.loop_stack.append(("REPEAT", block, j, count))
-                        self.execute_block(block[1:-1])
-                        if self.pending_ask:
-                            raise self.pending_ask
-                        if self.break_loop:
-                            self.break_loop = False
-                            break
-                    return {
-                        "output": self.output_log,
-                        "memory": self.memory
-                    }
-    
+                for j in range(i + 1, count):
+                    self.loop_stack.append((loop_type, block, j, count))
+                    self.execute_block(block[1:-1])
+                    self.loop_stack.pop()
+                    if self.pending_ask:
+                        raise self.pending_ask
+                    if self.break_loop:
+                        self.break_loop = False
+                        break
+                return {
+                    "output": self.output_log,
+                    "memory": self.memory
+                }
+
+            self.current_line_index = self.resume_line_index
             self.execute()
         except AskException as e:
             self.pending_ask = e
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
@@ -75,6 +79,7 @@ class StructuredJargonInterpreter:
             steps += 1
 
             line = self.lines[self.current_line_index]
+
             if self.break_loop:
                 self.break_loop = False
                 self.current_line_index += 1
@@ -82,7 +87,6 @@ class StructuredJargonInterpreter:
 
             if line == "BREAK":
                 self.break_loop = True
-
             elif line.startswith("SET "):
                 self.handle_set(line)
             elif line.startswith("PRINT "):
@@ -207,10 +211,6 @@ class StructuredJargonInterpreter:
         match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
         if match:
             question, var = match.groups()
-    
-            if self.loop_stack:
-                raise AskException(question, var)
-    
             val = self.memory.get(var, "")
             if val is None or (isinstance(val, str) and val.strip() == ""):
                 raise AskException(question, var)
@@ -245,12 +245,12 @@ class StructuredJargonInterpreter:
             return
         count = int(match.group(1))
         start_index = 0
-    
+
         if self.loop_stack and self.loop_stack[-1][1] == block:
             _, _, i, saved_count = self.loop_stack.pop()
             start_index = i + 1
             count = saved_count
-    
+
         for i in range(start_index, count):
             try:
                 self.loop_stack.append(("REPEAT", block, i, count))
@@ -266,18 +266,11 @@ class StructuredJargonInterpreter:
 
     def handle_repeat_until(self, block):
         condition = block[0].replace("REPEAT_UNTIL", "").strip()
-        start_index = 0
-    
-        if self.loop_stack and self.loop_stack[-1][0] == "REPEAT_UNTIL":
-            _, saved_block = self.loop_stack.pop()
-            if saved_block == block:
-                pass
-    
         while not self.evaluate_condition(condition):
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
-                self.loop_stack.append(("REPEAT_UNTIL", block))
+                self.loop_stack.append(("REPEAT_UNTIL", block, 0, 0))
                 raise e
             if self.pending_ask:
                 return
@@ -290,25 +283,23 @@ class StructuredJargonInterpreter:
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT_FOR_EACH syntax: {block[0]}")
             return
-    
         var, iterable = match.groups()
         items = self.memory.get(iterable, [])
         if not isinstance(items, list):
             self.output_log.append(f"[ERROR] {iterable} is not a list")
             return
-    
         start_index = 0
         if self.loop_stack and self.loop_stack[-1][0] == "REPEAT_FOR_EACH":
-            _, saved_block, saved_index = self.loop_stack.pop()
-            if saved_block == block:
-                start_index = saved_index + 1
-    
+            _, _, saved_index, _ = self.loop_stack.pop()
+            start_index = saved_index + 1
+
         for i in range(start_index, len(items)):
             self.memory[var] = items[i]
             try:
+                self.loop_stack.append(("REPEAT_FOR_EACH", block, i, len(items)))
                 self.execute_block(block[1:-1])
+                self.loop_stack.pop()
             except AskException as e:
-                self.loop_stack.append(("REPEAT_FOR_EACH", block, i))
                 raise e
             if self.pending_ask:
                 return
@@ -324,9 +315,8 @@ class StructuredJargonInterpreter:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps.")
                 break
             steps += 1
-    
+
             line = lines[index]
-    
             if line == "BREAK":
                 self.break_loop = True
                 break
@@ -343,37 +333,28 @@ class StructuredJargonInterpreter:
             elif line.startswith("IF "):
                 block, jump = self.collect_block_from(lines, index, "IF", "END")
                 self.handle_if_else(block)
-                if self.pending_ask:
-                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT "):
                 block, jump = self.collect_block_from(lines, index, "REPEAT", "END")
                 self.handle_repeat_n_times(block)
-                if self.pending_ask:
-                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT_UNTIL"):
                 block, jump = self.collect_block_from(lines, index, "REPEAT_UNTIL", "END")
                 self.handle_repeat_until(block)
-                if self.pending_ask:
-                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT_FOR_EACH"):
                 block, jump = self.collect_block_from(lines, index, "REPEAT_FOR_EACH", "END")
                 self.handle_repeat_for_each(block)
-                if self.pending_ask:
-                    raise self.pending_ask
                 index = jump
                 continue
             else:
                 self.output_log.append(f"[ERROR] Unknown command in block: {line}")
-    
+
             if self.pending_ask:
                 raise self.pending_ask
-    
             index += 1
 
     def safe_eval(self, expr):
