@@ -8,21 +8,19 @@ import traceback
 app = FastAPI()
 interpreter = StructuredJargonInterpreter()
 
-# ✅ CORS for frontend (change "*" to your domain for production)
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with "https://jargoninterpreter.netlify.app" in prod
+    allow_origins=["*"],  # Replace with your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Health check route
 @app.get("/")
 async def root():
     return {"message": "Backend is live"}
 
-# ✅ POST /run
 @app.post("/run")
 async def run_code(req: Request):
     try:
@@ -45,32 +43,23 @@ async def run_code(req: Request):
         }
 
     except Exception as e:
-        print("==== SERVER ERROR ====")
+        print("==== SERVER ERROR (/run) ====")
         print(traceback.format_exc())
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-# ✅ OPTIONS /run
-@app.options("/run", include_in_schema=False)
-async def run_options():
-    return JSONResponse(content={}, status_code=204)
-
-# ✅ POST /resume
 @app.post("/resume")
 async def resume_code(req: Request):
     try:
         data = await req.json()
         var = data.get("var")
         value = data.get("value")
-        code = data.get("code", "")  # Add this
+        code = data.get("code", "")
         memory = data.get("memory", {})
 
-        interpreter.memory[var] = value
-        interpreter.pending_ask = None
-
+        # Set value in memory and resume
+        memory[var] = value
         result = interpreter.resume(code, memory)
+
         return {
             "result": result["output"],
             "memory": result["memory"]
@@ -85,19 +74,10 @@ async def resume_code(req: Request):
         }
 
     except Exception as e:
-        print("==== SERVER ERROR ====")
+        print("==== SERVER ERROR (/resume) ====")
         print(traceback.format_exc())
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-# ✅ OPTIONS /resume
-@app.options("/resume", include_in_schema=False)
-async def resume_options():
-    return JSONResponse(content={}, status_code=204)
-
-# ✅ Fallback OPTIONS for any route
 @app.options("/{rest_of_path:path}", include_in_schema=False)
 async def preflight_handler(rest_of_path: str):
     return JSONResponse(status_code=204, content={})
