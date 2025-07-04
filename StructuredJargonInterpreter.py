@@ -202,7 +202,7 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        value = self.memory.get(var, None)
+        value = self.memory.get(var)
     
         if value is None or (isinstance(value, str) and value.strip() == ""):
             self.pending_ask = AskException(question, var)
@@ -253,16 +253,9 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.pending_line_index = None
     
-            # 👇 Clear ASKed variables used in the loop body
-            for line in block[1:-1]:
-                match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-                if match:
-                    _, var = match.groups()
-                    self.memory[var] = ""  # Clear it to force ASK again
-    
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1
+                ctx["index"] += 1  # ✅ Only increment after successful block
             except AskException as e:
                 print("🛑 AskException raised, pausing loop")
                 raise e
@@ -275,7 +268,7 @@ class StructuredJargonInterpreter:
     
         print("✅ Exiting _resume_repeat_n cleanly")
         self.resume_context = None
-
+    
     def handle_repeat_until(self, block):
         condition = block[0].replace("REPEAT_UNTIL", "").strip()
         self.resume_context = {
