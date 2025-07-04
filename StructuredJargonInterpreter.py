@@ -24,10 +24,6 @@ class StructuredJargonInterpreter:
 
         if self.resume_context:
             self.resume_loop()
-        elif self.resume_state:
-            i = self.resume_state["index"]
-            self.resume_state = None
-            self.execute_block(self.resume_state["lines"][i:])
         elif self.pending_line_index is not None:
             self.execute_block(self.lines[self.pending_line_index:])
             self.pending_line_index = None
@@ -58,13 +54,16 @@ class StructuredJargonInterpreter:
         }
 
     def resume_loop(self):
-        ctx = self.resume_context
-        if ctx["type"] == "times":
-            self._resume_repeat_n(ctx)
-        elif ctx["type"] == "until":
-            self._resume_repeat_until(ctx)
-        elif ctx["type"] == "foreach":
-            self._resume_repeat_foreach(ctx)
+        context = self.resume_context
+        if not context:
+            return
+        loop_type = context["type"]
+        if loop_type == "times":
+            self._resume_repeat_n(context)
+        elif loop_type == "until":
+            self._resume_repeat_until(context)
+        elif loop_type == "foreach":
+            self._resume_repeat_foreach(context)
 
     def execute_block(self, block):
         i = 0
@@ -90,10 +89,7 @@ class StructuredJargonInterpreter:
             elif line.startswith("REMOVE "):
                 self.handle_remove(line)
             elif line.startswith("ASK "):
-                self.resume_state = {
-                    "lines": block,
-                    "index": i
-                }
+                self.resume_state = {"lines": block, "index": i}
                 self.handle_ask(line)
             elif line.startswith("IF "):
                 sub_block, jump_to = self.collect_block(block, i, "END")
@@ -197,44 +193,36 @@ class StructuredJargonInterpreter:
         if not isinstance(value, str) or value.strip() == "":
             self.pending_ask = AskException(question, var)
             raise self.pending_ask
+        else:
+            self.pending_ask = None
 
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
-        true_block = []
-        false_block = []
+        true_block, false_block = [], []
         current_block = true_block
-        i = 1
-        nested = 0
+        i, nested = 1, 0
         while i < len(block) - 1:
             line = block[i]
             if line == "ELSE" and nested == 0:
                 current_block = false_block
                 i += 1
                 continue
-            if line.startswith("IF "):
-                nested += 1
-            elif line == "END":
-                if nested > 0:
-                    nested -= 1
+            if line.startswith("IF "): nested += 1
+            elif line == "END" and nested > 0: nested -= 1
             current_block.append(line)
             i += 1
-        if self.evaluate_condition(condition):
-            self.execute_block(true_block)
-        else:
-            self.execute_block(false_block)
+        (self.execute_block(true_block) if self.evaluate_condition(condition)
+         else self.execute_block(false_block))
 
     def handle_repeat_n_times(self, block):
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
         if not match:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
-        times = int(match.group(1))
         self.resume_context = {
-            "type": "times",
-            "block": block,
-            "index": 0,
-            "times": times
+            "type": "times", "block": block, "index": 0,
+            "times": int(match.group(1))
         }
         self._resume_repeat_n(self.resume_context)
 
@@ -248,18 +236,15 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
-            else:
-                ctx["index"] += 1
-            if self.break_loop:
-                break
+            ctx["index"] += 1
+            if self.break_loop: break
         self.resume_context = None
 
     def handle_repeat_until(self, block):
-        condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
+        condition = block[0].replace("REPEAT_UNTIL", "").strip()
         self.resume_context = {
-            "type": "until",
-            "block": block,
-            "condition": condition_line
+            "type": "until", "block": block,
+            "condition": condition
         }
         self._resume_repeat_until(self.resume_context)
 
@@ -276,8 +261,7 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
-            if self.break_loop:
-                break
+            if self.break_loop: break
         self.resume_context = None
 
     def handle_repeat_for_each(self, block):
@@ -291,11 +275,8 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] {iterable} is not a list")
             return
         self.resume_context = {
-            "type": "foreach",
-            "block": block,
-            "items": items,
-            "index": 0,
-            "var": var
+            "type": "foreach", "block": block,
+            "items": items, "index": 0, "var": var
         }
         self._resume_repeat_foreach(self.resume_context)
 
@@ -310,10 +291,8 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
-            else:
-                ctx["index"] += 1
-            if self.break_loop:
-                break
+            ctx["index"] += 1
+            if self.break_loop: break
         self.resume_context = None
 
     def safe_eval(self, expr):
@@ -322,8 +301,8 @@ class StructuredJargonInterpreter:
             code = compile(expr, "<string>", "eval")
             return eval(code, {"__builtins__": None}, {
                 "int": int, "abs": abs, "min": min, "max": max,
-                "float": float, "round": round, "list": list, "str": str, "bool": bool,
-                **self.memory
+                "float": float, "round": round, "list": list,
+                "str": str, "bool": bool, **self.memory
             })
         except Exception as e:
             self.output_log.append(f"[ERROR] Eval failed: {e} â in ({expr})")
