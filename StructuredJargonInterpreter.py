@@ -69,17 +69,6 @@ class StructuredJargonInterpreter:
         elif loop_type == "foreach":
             self._resume_repeat_foreach(context)
 
-    def _clear_ask_vars(self, block):
-        if self.pending_ask:
-            return
-        for line in block:
-            if line.startswith("ASK"):
-                match = re.match(r'ASK\s+".+?"\s+as\s+(\w+)', line)
-                if match:
-                    var = match.group(1)
-                    if var in self.memory:
-                        self.memory[var] = ""
-
     def execute_block(self, block):
         i = 0
         steps = 0
@@ -258,16 +247,19 @@ class StructuredJargonInterpreter:
     def _resume_repeat_n(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
+    
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
-            self._clear_ask_vars(block)
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+    
             ctx["index"] += 1
             if self.break_loop:
                 break
+    
         self.resume_context = None
     
     def handle_repeat_until(self, block):
@@ -283,17 +275,20 @@ class StructuredJargonInterpreter:
         self.resume_context = ctx
         block = ctx["block"]
         condition = ctx["condition"]
+    
         while True:
             self.break_loop = False
             if self.evaluate_condition(condition):
                 break
-            self._clear_ask_vars(block)
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+    
             if self.break_loop:
                 break
+    
         self.resume_context = None
 
     def handle_repeat_for_each(self, block):
@@ -318,17 +313,20 @@ class StructuredJargonInterpreter:
     def _resume_repeat_foreach(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
+    
         while ctx["index"] < len(ctx["items"]):
             self.memory[ctx["var"]] = ctx["items"][ctx["index"]]
             self.break_loop = False
-            self._clear_ask_vars(block)
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+    
             ctx["index"] += 1
             if self.break_loop:
                 break
+    
         self.resume_context = None
 
     def safe_eval(self, expr):
