@@ -183,8 +183,11 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        self.pending_ask = AskException(question, var)
-        raise self.pending_ask
+    
+        value = self.memory.get(var, None)
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            self.pending_ask = AskException(question, var)
+            raise self.pending_ask
 
     def handle_if_else(self, block):
         condition_line = block[0]
