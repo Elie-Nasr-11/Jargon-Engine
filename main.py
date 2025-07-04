@@ -30,17 +30,17 @@ async def run_code(req: Request):
 
         result = interpreter.run(code, memory)
 
+        if interpreter.pending_ask:
+            return {
+                "ask": interpreter.pending_ask.prompt,
+                "ask_var": interpreter.pending_ask.variable,
+                "result": result["output"],
+                "memory": result["memory"]
+            }
+
         return {
             "result": result["output"],
             "memory": result["memory"]
-        }
-
-    except AskException as ask:
-        return {
-            "ask": ask.prompt,
-            "ask_var": ask.variable,
-            "result": interpreter.output_log,
-            "memory": interpreter.memory
         }
 
     except Exception as e:
@@ -72,18 +72,17 @@ async def resume_code(req: Request):
 
         result = interpreter.resume(code, memory)
 
+        if interpreter.pending_ask:
+            return {
+                "ask": interpreter.pending_ask.prompt,
+                "ask_var": interpreter.pending_ask.variable,
+                "result": result["output"],
+                "memory": result["memory"]
+            }
+        
         return {
             "result": result["output"],
             "memory": result["memory"]
-        }
-
-    except AskException as ask:
-        print(">>> ASK triggered again:", ask.prompt)
-        return {
-            "ask": ask.prompt,
-            "ask_var": ask.variable,
-            "result": interpreter.output_log,
-            "memory": interpreter.memory
         }
 
     except Exception as e:
@@ -96,7 +95,7 @@ async def resume_code(req: Request):
                 "trace": traceback.format_exc()
             }
         )
-
+        
 @app.options("/{rest_of_path:path}", include_in_schema=False)
 async def preflight_handler(rest_of_path: str):
     return JSONResponse(status_code=204, content={})
