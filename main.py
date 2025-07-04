@@ -35,14 +35,15 @@ async def run_code(req: Request):
         }
 
 @app.post("/resume")
-async def resume_code(req: Request):
+async def resume_execution(req: Request):
     data = await req.json()
     var = data.get("var")
     value = data.get("value")
 
-    interpreter.memory[var] = value
-    interpreter.pending_ask = None
+    if not var:
+        return {"result": ["[ERROR] No variable provided for resume."]}
 
+    interpreter.memory[var] = value
     try:
         result = interpreter.run(interpreter.code, interpreter.memory)
         return {
