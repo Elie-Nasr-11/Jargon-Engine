@@ -251,16 +251,14 @@ class StructuredJargonInterpreter:
     
             try:
                 self.execute_block(block[1:-1])
+                ctx["index"] += 1  # ✅ only increment if successful
             except AskException as e:
                 print("🛑 AskException raised, pausing loop")
-                self.resume_context = ctx
-                self.resume_state = None
+                # DO NOT increment — we’ll retry same loop index after input
                 raise e
             except Exception as e:
-                print("❌ Other exception in repeat_n:", str(e))
+                print("❌ Other exception:", str(e))
                 raise e
-            else:
-                ctx["index"] += 1
     
             if self.break_loop:
                 break
