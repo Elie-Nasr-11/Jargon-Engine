@@ -41,6 +41,22 @@ class StructuredJargonInterpreter:
         self.break_loop = False
     
         try:
+            if self.loop_stack:
+                loop_type, block, i, count = self.loop_stack.pop()
+                if loop_type == "REPEAT":
+                    for j in range(i + 1, count):
+                        self.loop_stack.append(("REPEAT", block, j, count))
+                        self.execute_block(block[1:-1])
+                        if self.pending_ask:
+                            raise self.pending_ask
+                        if self.break_loop:
+                            self.break_loop = False
+                            break
+                    return {
+                        "output": self.output_log,
+                        "memory": self.memory
+                    }
+    
             self.execute()
         except AskException as e:
             self.pending_ask = e
@@ -229,18 +245,18 @@ class StructuredJargonInterpreter:
             return
         count = int(match.group(1))
         start_index = 0
-        
-        if self.loop_stack and self.loop_stack[-1][0] == "REPEAT":
-            _, saved_block, i, saved_count = self.loop_stack.pop()
-            if saved_block == block:
-                start_index = i + 1
-                count = saved_count
+    
+        if self.loop_stack and self.loop_stack[-1][1] == block:
+            _, _, i, saved_count = self.loop_stack.pop()
+            start_index = i + 1
+            count = saved_count
     
         for i in range(start_index, count):
             try:
-                self.execute_block(block[1:-1])
-            except AskException as e:
                 self.loop_stack.append(("REPEAT", block, i, count))
+                self.execute_block(block[1:-1])
+                self.loop_stack.pop()
+            except AskException as e:
                 raise e
             if self.pending_ask:
                 return
