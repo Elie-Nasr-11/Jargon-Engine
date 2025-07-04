@@ -21,15 +21,19 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
-
+    
         if self.resume_context:
             self.resume_loop()
+        elif self.resume_state: 
+            i = self.resume_state["index"]
+            self.resume_state = None
+            self.execute_block(self.lines[i:])
         elif self.pending_line_index is not None:
             self.execute_block(self.lines[self.pending_line_index:])
             self.pending_line_index = None
         else:
             self.execute_block(self.lines)
-
+    
         return {
             "output": self.output_log,
             "memory": self.memory
@@ -215,16 +219,27 @@ class StructuredJargonInterpreter:
         (self.execute_block(true_block) if self.evaluate_condition(condition)
          else self.execute_block(false_block))
 
-    def handle_repeat_n_times(self, block):
-        match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
-        if not match:
-            self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
-            return
-        self.resume_context = {
-            "type": "times", "block": block, "index": 0,
-            "times": int(match.group(1))
-        }
-        self._resume_repeat_n(self.resume_context)
+    def _resume_repeat_n(self, ctx):
+        self.resume_context = ctx
+        block = ctx["block"]
+    
+        while ctx["index"] < ctx["times"]:
+            self.break_loop = False
+            self.pending_line_index = None
+    
+            try:
+                self.execute_block(block[1:-1])
+                ctx["index"] += 1  
+            except AskException as e:
+                self.resume_context = ctx
+                self.resume_state = None
+                self.pending_line_index = None
+                raise e
+    
+            if self.break_loop:
+                break
+    
+        self.resume_context = None
 
     def _resume_repeat_n(self, ctx):
         self.resume_context = ctx
