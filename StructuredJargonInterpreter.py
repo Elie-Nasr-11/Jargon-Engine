@@ -234,31 +234,32 @@ class StructuredJargonInterpreter:
         self._resume_repeat_n(self.resume_context)
 
     def _resume_repeat_n(self, ctx):
-        print("↪️ Entered _resume_repeat_n loop")  # NEW DEBUG
+        print("↪️ Entered _resume_repeat_n loop")
         self.resume_context = ctx
         block = ctx["block"]
     
         while ctx["index"] < ctx["times"]:
-            print(f"🔁 Loop index: {ctx['index']} / {ctx['times']}")  # NEW DEBUG
+            print(f"🔁 Loop index: {ctx['index']} / {ctx['times']}")
             self.break_loop = False
             self.pending_line_index = None
     
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
-                print("🛑 AskException raised inside repeat_n")  # NEW DEBUG
+                print("🛑 AskException raised, pausing loop")
+                self.resume_context = ctx
+                self.resume_state = None
                 raise e
             except Exception as e:
-                print("❌ Other exception:", str(e))  # NEW DEBUG
-                raise e  # re-raise to propagate to FastAPI
-    
+                print("❌ Other exception in repeat_n:", str(e))
+                raise e
             else:
                 ctx["index"] += 1
     
             if self.break_loop:
                 break
     
-        print("✅ Exiting _resume_repeat_n cleanly")  # NEW DEBUG
+        print("✅ Exiting _resume_repeat_n cleanly")
         self.resume_context = None
 
     def handle_repeat_until(self, block):
