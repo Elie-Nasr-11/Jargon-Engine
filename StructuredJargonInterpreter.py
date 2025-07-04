@@ -7,7 +7,6 @@ class StructuredJargonInterpreter:
         self.lines = []
         self.memory = {}
         self.output_log = []
-        self.loop_stack = []
         self.pending_ask = None
         self.current_line_index = 0
         self.max_steps = 1000
@@ -18,7 +17,6 @@ class StructuredJargonInterpreter:
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.output_log = []
-        self.loop_stack = []
         self.pending_ask = None
         self.current_line_index = 0
         self.break_loop = False
@@ -122,6 +120,23 @@ class StructuredJargonInterpreter:
             i += 1
         return block, i + 1
 
+    def collect_block_from(self, lines, start_index, start_kw, end_kw):
+        block = [lines[start_index]]
+        i = start_index + 1
+        nested = 1
+        while i < len(lines):
+            line = lines[i]
+            if line.startswith(start_kw):
+                nested += 1
+            elif line == end_kw:
+                nested -= 1
+                if nested == 0:
+                    block.append(line)
+                    break
+            block.append(line)
+            i += 1
+        return block, i + 1
+
     def handle_set(self, line):
         match = re.match(r'SET\s+(\w+)\[(.+?)\]\s*\((.+)\)', line)
         if match:
@@ -176,7 +191,7 @@ class StructuredJargonInterpreter:
         if match:
             question, var = match.groups()
             val = self.memory.get(var, "")
-            if isinstance(val, str) and val.strip() == "":
+            if val is None or (isinstance(val, str) and val.strip() == ""):
                 raise AskException(question, var)
         else:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
@@ -249,14 +264,55 @@ class StructuredJargonInterpreter:
                 break
 
     def execute_block(self, lines):
-        prev_index = self.current_line_index
-        self.current_line_index = 0
-        while self.current_line_index < len(lines):
-            line = lines[self.current_line_index]
-            self.lines.insert(self.current_line_index + 1, *lines[self.current_line_index + 1:])
-            self.execute()
-            self.current_line_index += 1
-        self.current_line_index = prev_index
+        index = 0
+        steps = 0
+        while index < len(lines):
+            if steps >= self.max_steps:
+                self.output_log.append("[ERROR] Execution stopped: Too many steps.")
+                break
+            steps += 1
+    
+            line = lines[index]
+    
+            if line == "BREAK":
+                self.break_loop = True
+                break
+            elif line.startswith("SET "):
+                self.handle_set(line)
+            elif line.startswith("PRINT "):
+                self.handle_print(line)
+            elif line.startswith("ADD "):
+                self.handle_add(line)
+            elif line.startswith("REMOVE "):
+                self.handle_remove(line)
+            elif line.startswith("ASK "):
+                self.handle_ask(line)
+            elif line.startswith("IF "):
+                block, jump = self.collect_block_from(lines, index, "IF", "END")
+                self.handle_if_else(block)
+                index = jump
+                continue
+            elif line.startswith("REPEAT "):
+                block, jump = self.collect_block_from(lines, index, "REPEAT", "END")
+                self.handle_repeat_n_times(block)
+                index = jump
+                continue
+            elif line.startswith("REPEAT_UNTIL"):
+                block, jump = self.collect_block_from(lines, index, "REPEAT_UNTIL", "END")
+                self.handle_repeat_until(block)
+                index = jump
+                continue
+            elif line.startswith("REPEAT_FOR_EACH"):
+                block, jump = self.collect_block_from(lines, index, "REPEAT_FOR_EACH", "END")
+                self.handle_repeat_for_each(block)
+                index = jump
+                continue
+            else:
+                self.output_log.append(f"[ERROR] Unknown command in block: {line}")
+    
+            index += 1
+            if self.pending_ask:
+                raise self.pending_ask
 
     def safe_eval(self, expr):
         try:
