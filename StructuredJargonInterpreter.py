@@ -21,14 +21,16 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
-        self.pending_line_index = None
 
         if self.resume_context:
             self.resume_loop()
         elif self.resume_state:
             i = self.resume_state["index"]
             self.resume_state = None
-            self.execute_block(self.lines[i:])
+            self.execute_block(self.resume_state["lines"][i:])
+        elif self.pending_line_index is not None:
+            self.execute_block(self.lines[self.pending_line_index:])
+            self.pending_line_index = None
         else:
             self.execute_block(self.lines)
 
@@ -56,16 +58,13 @@ class StructuredJargonInterpreter:
         }
 
     def resume_loop(self):
-        context = self.resume_context
-        if not context:
-            return
-        loop_type = context["type"]
-        if loop_type == "times":
-            self._resume_repeat_n(context)
-        elif loop_type == "until":
-            self._resume_repeat_until(context)
-        elif loop_type == "foreach":
-            self._resume_repeat_foreach(context)
+        ctx = self.resume_context
+        if ctx["type"] == "times":
+            self._resume_repeat_n(ctx)
+        elif ctx["type"] == "until":
+            self._resume_repeat_until(ctx)
+        elif ctx["type"] == "foreach":
+            self._resume_repeat_foreach(ctx)
 
     def execute_block(self, block):
         i = 0
@@ -195,16 +194,35 @@ class StructuredJargonInterpreter:
             return
         question, var = match.groups()
         value = self.memory.get(var, "")
-        if value.strip() == "":
+        if not isinstance(value, str) or value.strip() == "":
             self.pending_ask = AskException(question, var)
             raise self.pending_ask
 
-    def _reset_ask_vars_in_block(self, block):
-        for line in block:
-            if line.startswith("ASK "):
-                match = re.match(r'ASK\s+".+?"\s+as\s+(\w+)', line)
-                if match:
-                    self.memory[match.group(1)] = ""
+    def handle_if_else(self, block):
+        condition_line = block[0]
+        condition = condition_line.replace("IF", "").replace("THEN", "").strip()
+        true_block = []
+        false_block = []
+        current_block = true_block
+        i = 1
+        nested = 0
+        while i < len(block) - 1:
+            line = block[i]
+            if line == "ELSE" and nested == 0:
+                current_block = false_block
+                i += 1
+                continue
+            if line.startswith("IF "):
+                nested += 1
+            elif line == "END":
+                if nested > 0:
+                    nested -= 1
+            current_block.append(line)
+            i += 1
+        if self.evaluate_condition(condition):
+            self.execute_block(true_block)
+        else:
+            self.execute_block(false_block)
 
     def handle_repeat_n_times(self, block):
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
@@ -225,7 +243,7 @@ class StructuredJargonInterpreter:
         block = ctx["block"]
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
-            self._reset_ask_vars_in_block(block)
+            self.pending_line_index = None
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
@@ -251,7 +269,7 @@ class StructuredJargonInterpreter:
         condition = ctx["condition"]
         while True:
             self.break_loop = False
-            self._reset_ask_vars_in_block(block)
+            self.pending_line_index = None
             if self.evaluate_condition(condition):
                 break
             try:
@@ -287,7 +305,7 @@ class StructuredJargonInterpreter:
         while ctx["index"] < len(ctx["items"]):
             self.memory[ctx["var"]] = ctx["items"][ctx["index"]]
             self.break_loop = False
-            self._reset_ask_vars_in_block(block)
+            self.pending_line_index = None
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
