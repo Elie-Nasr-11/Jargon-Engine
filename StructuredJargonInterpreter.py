@@ -250,13 +250,15 @@ class StructuredJargonInterpreter:
     
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
+            self.pending_line_index = None
     
             try:
                 self.execute_block(block[1:-1])
+                ctx["index"] += 1  # Only increment after successful execution
             except AskException as e:
+                self.resume_context = ctx  # Preserve context
                 raise e
     
-            ctx["index"] += 1
             if self.break_loop:
                 break
     
@@ -278,12 +280,15 @@ class StructuredJargonInterpreter:
     
         while True:
             self.break_loop = False
+            self.pending_line_index = None
+    
             if self.evaluate_condition(condition):
                 break
     
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
+                self.resume_context = ctx
                 raise e
     
             if self.break_loop:
@@ -317,13 +322,15 @@ class StructuredJargonInterpreter:
         while ctx["index"] < len(ctx["items"]):
             self.memory[ctx["var"]] = ctx["items"][ctx["index"]]
             self.break_loop = False
+            self.pending_line_index = None
     
             try:
                 self.execute_block(block[1:-1])
+                ctx["index"] += 1  # Only increment after successful execution
             except AskException as e:
+                self.resume_context = ctx
                 raise e
     
-            ctx["index"] += 1
             if self.break_loop:
                 break
     
