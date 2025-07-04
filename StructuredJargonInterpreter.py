@@ -9,16 +9,19 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
 
     def run(self, code: str, memory: dict):
+        self.code = code  
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-
+    
         if self.resume_context:
             self.resume_loop()
         else:
+            self.resume_context = None
             self.execute_block(self.lines)
+    
         return {
             "output": '\n'.join(self.output_log),
             "memory": self.memory
