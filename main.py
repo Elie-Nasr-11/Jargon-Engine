@@ -64,5 +64,5 @@ async def resume_code(req: Request):
 from fastapi.responses import JSONResponse
 
 @app.options("/{rest_of_path:path}", include_in_schema=False)
-async def preflight_handler():
+async def preflight_handler(rest_of_path: str):
     return JSONResponse(status_code=204, content={})
