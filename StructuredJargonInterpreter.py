@@ -17,7 +17,12 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
-        self.resume_loop()
+    
+        if self.resume_context:
+            self.resume_loop()
+        else:
+            self.execute_block(self.lines)
+    
         return {
             "output": self.output_log,
             "memory": self.memory
