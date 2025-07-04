@@ -23,7 +23,7 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
     
         if self.resume_context:
-            return self.resume_loop()
+            return self._resume_repeat_n(self.resume_context)
         elif self.resume_state:
             i = self.resume_state["index"]
             self.resume_state = None
@@ -243,6 +243,7 @@ class StructuredJargonInterpreter:
 
     def _resume_repeat_n(self, ctx):
         print("↪️ Entered _resume_repeat_n loop")
+        print(f"▶️ Resuming repeat loop at index {ctx['index']} of {ctx['times']}")
         self.resume_context = ctx
         block = ctx["block"]
     
