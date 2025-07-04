@@ -8,8 +8,23 @@ class StructuredJargonInterpreter:
         self.break_loop = False
         self.pending_ask = None
 
+    
+    def resume(self, memory: dict):
+        self.memory = memory.copy()
+        self.output_log = []
+        self.break_loop = False
+        self.pending_ask = None
+        self.resume_loop()
+        return {
+            "output": '\n'.join(self.output_log),
+            "memory": self.memory
+        }
+
+
     def run(self, code: str, memory: dict):
-        self.code = code  
+        if not self.code:
+            self.code = code
+            self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
@@ -206,6 +221,7 @@ class StructuredJargonInterpreter:
         self._resume_repeat_n(self.resume_context)
 
     def _resume_repeat_n(self, ctx):
+        self.resume_context = ctx
         block = ctx["block"]
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
@@ -228,6 +244,7 @@ class StructuredJargonInterpreter:
         self._resume_repeat_until(self.resume_context)
 
     def _resume_repeat_until(self, ctx):
+        self.resume_context = ctx
         block = ctx["block"]
         while not self.evaluate_condition(ctx["condition"]):
             self.break_loop = False
@@ -259,6 +276,7 @@ class StructuredJargonInterpreter:
         self._resume_repeat_foreach(self.resume_context)
 
     def _resume_repeat_foreach(self, ctx):
+        self.resume_context = ctx
         block = ctx["block"]
         while ctx["index"] < len(ctx["items"]):
             self.memory[ctx["var"]] = ctx["items"][ctx["index"]]
@@ -282,7 +300,7 @@ class StructuredJargonInterpreter:
                 **self.memory
             })
         except Exception as e:
-            self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
+            self.output_log.append(f"[ERROR] Eval failed: {e} â in ({expr})")
             return None
 
     def evaluate_condition(self, text: str) -> bool:
@@ -325,5 +343,5 @@ class StructuredJargonInterpreter:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
         except Exception as e:
-            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
+            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} â in ({text})")
             return False
