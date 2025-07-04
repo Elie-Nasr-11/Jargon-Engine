@@ -229,15 +229,24 @@ class StructuredJargonInterpreter:
     def _resume_repeat_n(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
+    
         while ctx["index"] < ctx["times"]:
+            print(f"[LOOP] Iteration: {ctx['index']} of {ctx['times']}")
             self.break_loop = False
             self.pending_line_index = None
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
+                print(f"[ASK] Triggered at loop index {ctx['index']}")
+                self.resume_context = ctx
                 raise e
+    
+            print(f"[LOOP] Completed iteration: {ctx['index']}")
             ctx["index"] += 1
-            if self.break_loop: break
+            if self.break_loop:
+                break
+    
         self.resume_context = None
 
     def handle_repeat_until(self, block):
