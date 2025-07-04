@@ -8,7 +8,7 @@ interpreter = StructuredJargonInterpreter()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For dev; restrict in prod
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +30,29 @@ async def run_code(req: Request):
         return {
             "ask": ask.prompt,
             "ask_var": ask.variable,
-            "result": interpreter.output_log,  # This can stay as-is
-            "memory": interpreter.memory        # So frontend continues state
+            "result": interpreter.output_log,  
+            "memory": interpreter.memory      
+        }
+
+@app.post("/resume")
+async def resume_code(req: Request):
+    data = await req.json()
+    var = data.get("var")
+    value = data.get("value")
+
+    interpreter.memory[var] = value
+    interpreter.pending_ask = None
+
+    try:
+        result = interpreter.run(interpreter.code, interpreter.memory)
+        return {
+            "result": result["output"],
+            "memory": result["memory"]
+        }
+    except AskException as ask:
+        return {
+            "ask": ask.prompt,
+            "ask_var": ask.variable,
+            "result": interpreter.output_log,
+            "memory": interpreter.memory
         }
