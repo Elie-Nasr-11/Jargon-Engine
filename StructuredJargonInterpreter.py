@@ -3,8 +3,8 @@ from AskException import AskException
 
 class StructuredJargonInterpreter:
     def __init__(self):
-        self.code = ""                
-        self.lines = []               
+        self.code = ""
+        self.lines = []
         self.memory = {}
         self.output_log = []
         self.pending_ask = None
@@ -19,20 +19,20 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
-    
+
         if self.resume_context:
             self.resume_loop()
         else:
             self.execute_block(self.lines)
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
         }
-    
+
     def run(self, code: str, memory: dict):
-        self.code = code                                   
-        self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()] 
+        self.code = code
+        self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
@@ -51,6 +51,8 @@ class StructuredJargonInterpreter:
 
     def resume_loop(self):
         context = self.resume_context
+        if not context:
+            return
         loop_type = context["type"]
         if loop_type == "times":
             self._resume_repeat_n(context)
@@ -176,15 +178,15 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
 
     def handle_ask(self, line):
-    match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-    if not match:
-        self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
-        return
-    question, var = match.groups()
-    if var not in self.memory or self.memory[var] in [None, ""]:
-        self.pending_ask = AskException(question, var)
-        raise self.pending_ask  
-        
+        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+        if not match:
+            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+            return
+        question, var = match.groups()
+        if var not in self.memory or self.memory[var] in [None, ""]:
+            self.pending_ask = AskException(question, var)
+            raise self.pending_ask
+
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
@@ -308,17 +310,15 @@ class StructuredJargonInterpreter:
                 **self.memory
             })
         except Exception as e:
-            self.output_log.append(f"[ERROR] Eval failed: {e} â in ({expr})")
+            self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
             return None
 
     def evaluate_condition(self, text: str) -> bool:
         try:
             if "AND" in text:
-                parts = text.split("AND")
-                return all(self.evaluate_condition(p.strip()) for p in parts)
+                return all(self.evaluate_condition(p.strip()) for p in text.split("AND"))
             elif "OR" in text:
-                parts = text.split("OR")
-                return any(self.evaluate_condition(p.strip()) for p in parts)
+                return any(self.evaluate_condition(p.strip()) for p in text.split("OR"))
             elif "is equal to" in text:
                 a, b = text.split("is equal to")
                 return self.safe_eval(a) == self.safe_eval(b)
@@ -351,5 +351,5 @@ class StructuredJargonInterpreter:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
         except Exception as e:
-            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} â in ({text})")
+            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
             return False
