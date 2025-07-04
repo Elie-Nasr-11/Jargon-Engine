@@ -74,20 +74,37 @@ async def resume_code(req: Request):
 
         # Set value and continue
         memory[var] = value
-        result = interpreter.resume(code, memory)
+        print(">>> Resuming with:", var, value)
+        print(">>> Code snippet:\n", code)
+        print(">>> Memory:", memory)
 
-        return {
-            "result": result["output"],
-            "memory": result["memory"]
-        }
+        try:
+            result = interpreter.resume(code, memory)
+            return {
+                "result": result["output"],
+                "memory": result["memory"]
+            }
 
-    except AskException as ask:
-        return {
-            "ask": ask.prompt,
-            "ask_var": ask.variable,
-            "result": interpreter.output_log,
-            "memory": interpreter.memory
-        }
+        except AskException as ask:
+            print(">>> ASK triggered again:", ask.prompt)
+            return {
+                "ask": ask.prompt,
+                "ask_var": ask.variable,
+                "result": interpreter.output_log,
+                "memory": interpreter.memory
+            }
+
+        except Exception as e:
+            import traceback
+            print(">>> RESUME CRASH >>>")
+            print(traceback.format_exc())
+            raise
+
+    except Exception as e:
+        print("==== SERVER ERROR (/resume outer) ====")
+        import traceback
+        print(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
     except Exception as e:
         print("==== SERVER ERROR (/resume) ====")
