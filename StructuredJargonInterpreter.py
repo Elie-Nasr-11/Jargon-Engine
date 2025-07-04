@@ -191,6 +191,10 @@ class StructuredJargonInterpreter:
         match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
         if match:
             question, var = match.groups()
+    
+            if self.loop_stack:
+                raise AskException(question, var)
+    
             val = self.memory.get(var, "")
             if val is None or (isinstance(val, str) and val.strip() == ""):
                 raise AskException(question, var)
