@@ -23,7 +23,7 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
     
         if self.resume_context:
-            self._resume_repeat_n(self.resume_context)
+            return self._resume_repeat_n(self.resume_context)
         elif self.resume_state:
             i = self.resume_state["index"]
             self.resume_state = None
@@ -271,6 +271,11 @@ class StructuredJargonInterpreter:
         print("✅ Exiting _resume_repeat_n cleanly")
         self.pending_ask = None
         self.resume_context = None
+        
+        return {
+            "output": self.output_log,
+            "memory": self.memory
+        }
     
     def handle_repeat_until(self, block):
         condition = block[0].replace("REPEAT_UNTIL", "").strip()
