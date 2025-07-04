@@ -64,11 +64,13 @@ async def resume_code(req: Request):
         data = await req.json()
         var = data.get("var")
         value = data.get("value")
+        code = data.get("code", "")  # Add this
+        memory = data.get("memory", {})
 
         interpreter.memory[var] = value
         interpreter.pending_ask = None
 
-        result = interpreter.resume(interpreter.memory)
+        result = interpreter.resume(code, memory)
         return {
             "result": result["output"],
             "memory": result["memory"]
