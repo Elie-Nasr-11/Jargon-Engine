@@ -176,14 +176,15 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] {list_name} is not a list or not defined")
 
     def handle_ask(self, line):
-        match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
-        if not match:
-            self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
-            return
-        question, var = match.groups()
-        if var not in self.memory or self.memory[var] in [None, ""]:
-            self.pending_ask = AskException(question, var)
-
+    match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+    if not match:
+        self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
+        return
+    question, var = match.groups()
+    if var not in self.memory or self.memory[var] in [None, ""]:
+        self.pending_ask = AskException(question, var)
+        raise self.pending_ask  
+        
     def handle_if_else(self, block):
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
