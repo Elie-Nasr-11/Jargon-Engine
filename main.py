@@ -14,6 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {"message": "Backend is live"}
+
 @app.post("/run")
 async def run_code(req: Request):
     data = await req.json()
