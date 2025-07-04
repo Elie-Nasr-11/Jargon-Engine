@@ -12,20 +12,18 @@ class StructuredJargonInterpreter:
         self.max_steps = 1000
         self.break_loop = False
 
-    def resume(self, memory: dict):
+    def resume(self, code: str, memory: dict):
+        self.code = code
+        self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.output_log = []
         self.break_loop = False
-        self.pending_ask = None  
-        
-        try:
-            if self.resume_context:
-                self.resume_loop()
-            else:
-                self.execute_block(self.lines)
-        except AskException as ask:
-            self.pending_ask = ask  
-            raise ask
+        self.pending_ask = None
+    
+        if self.resume_context:
+            self.resume_loop()
+        else:
+            self.execute_block(self.lines)
     
         return {
             "output": self.output_log,
