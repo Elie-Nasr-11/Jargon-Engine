@@ -25,7 +25,8 @@ class StructuredJargonInterpreter:
         if self.resume_context:
             self.resume_loop()
         elif self.resume_state:
-            i = self.resume_state["index"] + 1
+      
+            i = self.resume_state["index"]
             self.resume_state = None
             self.execute_block(self.lines[i:])
         elif self.pending_line_index is not None:
@@ -196,8 +197,9 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        value = self.memory.get(var, None)
-        if value is None or (isinstance(value, str) and value.strip() == ""):
+    
+        value = self.memory.get(var, "")
+        if not isinstance(value, str) or value.strip() == "":
             self.pending_ask = AskException(question, var)
             raise self.pending_ask
 
@@ -254,12 +256,11 @@ class StructuredJargonInterpreter:
     
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1
             except AskException as e:
-                self.resume_context = ctx
-                self.resume_state = None
-                self.pending_line_index = None
+                # DO NOT increment index here!
                 raise e
+            else:
+                ctx["index"] += 1
     
             if self.break_loop:
                 break
