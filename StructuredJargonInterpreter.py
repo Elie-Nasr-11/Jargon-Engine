@@ -202,9 +202,12 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
-        self.pending_ask = AskException(question, var)
-        raise self.pending_ask
+        value = self.memory.get(var, "")
+        if not isinstance(value, str) or value.strip() == "":
+            self.pending_ask = AskException(question, var)
+            raise self.pending_ask
+        else:
+            self.pending_ask = None
 
     def handle_if_else(self, block):
         condition_line = block[0]
@@ -251,10 +254,9 @@ class StructuredJargonInterpreter:
     
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1  # ✅ only increment if successful
+                ctx["index"] += 1  # ✅ only if no ASK happened
             except AskException as e:
                 print("🛑 AskException raised, pausing loop")
-                # DO NOT increment — we’ll retry same loop index after input
                 raise e
             except Exception as e:
                 print("❌ Other exception:", str(e))
