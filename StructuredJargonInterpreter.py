@@ -264,14 +264,24 @@ class StructuredJargonInterpreter:
     def _resume_repeat_until(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
-        while not self.evaluate_condition(ctx["condition"]):
+        condition = ctx["condition"]
+    
+        while not self.evaluate_condition(condition):
             self.break_loop = False
+    
+            # 🧠 Reset variable tied to the condition to trigger ASK again
+            condition_var = condition.split()[0].strip()
+            if condition_var in self.memory:
+                self.memory[condition_var] = ""
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+    
             if self.break_loop:
                 break
+    
         self.resume_context = None
 
     def handle_repeat_for_each(self, block):
