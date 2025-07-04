@@ -241,8 +241,16 @@ class StructuredJargonInterpreter:
     def _resume_repeat_n(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
+    
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
+    
+            for line in block:
+                if line.startswith("ASK"):
+                    var_match = re.match(r'ASK\s+".+?"\s+as\s+(\w+)', line)
+                    if var_match:
+                        var = var_match.group(1)
+                        self.memory[var] = ""
     
             try:
                 self.execute_block(block[1:-1])
@@ -252,8 +260,8 @@ class StructuredJargonInterpreter:
             ctx["index"] += 1
             if self.break_loop:
                 break
-        self.resume_context = None
 
+    self.resume_context = None
     def handle_repeat_until(self, block):
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
         self.resume_context = {
@@ -268,12 +276,18 @@ class StructuredJargonInterpreter:
         block = ctx["block"]
         condition = ctx["condition"]
     
-        while not self.evaluate_condition(condition):
+        while True:
             self.break_loop = False
-    
-            condition_var = condition.split()[0].strip()
-            if condition_var in self.memory:
-                self.memory[condition_var] = ""
+            
+            if self.evaluate_condition(condition):
+                break
+
+            for line in block:
+                if line.startswith("ASK"):
+                    var_match = re.match(r'ASK\s+".+?"\s+as\s+(\w+)', line)
+                    if var_match:
+                        var = var_match.group(1)
+                        self.memory[var] = ""
     
             try:
                 self.execute_block(block[1:-1])
