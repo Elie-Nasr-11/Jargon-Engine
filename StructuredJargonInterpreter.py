@@ -254,9 +254,11 @@ class StructuredJargonInterpreter:
     
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1  # Only increment after successful execution
+                ctx["index"] += 1
             except AskException as e:
-                self.resume_context = ctx  # Preserve context
+                self.resume_context = ctx
+                self.resume_state = None
+                self.pending_line_index = None
                 raise e
     
             if self.break_loop:
@@ -272,7 +274,7 @@ class StructuredJargonInterpreter:
             "condition": condition_line
         }
         self._resume_repeat_until(self.resume_context)
-
+    
     def _resume_repeat_until(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
@@ -289,6 +291,8 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 self.resume_context = ctx
+                self.resume_state = None
+                self.pending_line_index = None
                 raise e
     
             if self.break_loop:
@@ -326,9 +330,11 @@ class StructuredJargonInterpreter:
     
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1  # Only increment after successful execution
+                ctx["index"] += 1
             except AskException as e:
                 self.resume_context = ctx
+                self.resume_state = None
+                self.pending_line_index = None
                 raise e
     
             if self.break_loop:
