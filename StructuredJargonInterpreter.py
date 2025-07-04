@@ -23,14 +23,14 @@ class StructuredJargonInterpreter:
         else:
             self.execute_block(self.lines)
     
-        if self.pending_ask:
-            raise self.pending_ask
+        if not self.pending_ask:
+            self.resume_context = None
     
         return {
             "output": self.output_log,
             "memory": self.memory
         }
-
+    
     def run(self, code: str, memory: dict):
         self.code = code                                   
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()] 
