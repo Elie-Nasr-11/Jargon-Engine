@@ -253,23 +253,23 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.pending_line_index = None
     
-            # 👇 Clear ASK variables before each iteration
+            # Clear ASK variables to trigger ASK
             for line in block[1:-1]:
                 match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
                 if match:
                     _, var = match.groups()
-                    if var in self.memory:
-                        self.memory[var] = ""
+                    self.memory[var] = ""
     
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1
             except AskException as e:
                 print("🛑 AskException raised, pausing loop")
                 raise e
             except Exception as e:
                 print("❌ Other exception:", str(e))
                 raise e
+            else:
+                ctx["index"] += 1  # ✅ Move here: only advance if no ASK interrupted
     
             if self.break_loop:
                 break
