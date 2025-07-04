@@ -290,29 +290,38 @@ class StructuredJargonInterpreter:
             elif line.startswith("IF "):
                 block, jump = self.collect_block_from(lines, index, "IF", "END")
                 self.handle_if_else(block)
+                if self.pending_ask:
+                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT "):
                 block, jump = self.collect_block_from(lines, index, "REPEAT", "END")
                 self.handle_repeat_n_times(block)
+                if self.pending_ask:
+                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT_UNTIL"):
                 block, jump = self.collect_block_from(lines, index, "REPEAT_UNTIL", "END")
                 self.handle_repeat_until(block)
+                if self.pending_ask:
+                    raise self.pending_ask
                 index = jump
                 continue
             elif line.startswith("REPEAT_FOR_EACH"):
                 block, jump = self.collect_block_from(lines, index, "REPEAT_FOR_EACH", "END")
                 self.handle_repeat_for_each(block)
+                if self.pending_ask:
+                    raise self.pending_ask
                 index = jump
                 continue
             else:
                 self.output_log.append(f"[ERROR] Unknown command in block: {line}")
     
-            index += 1
             if self.pending_ask:
                 raise self.pending_ask
+    
+            index += 1
 
     def safe_eval(self, expr):
         try:
