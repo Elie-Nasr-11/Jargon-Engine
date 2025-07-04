@@ -10,7 +10,7 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
         self.resume_context = None
         self.resume_state = None
-        self.pending_line_index = None  # ✅ missing in your code
+        self.pending_line_index = None
         self.max_steps = 1000
         self.break_loop = False
 
@@ -21,17 +21,14 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.break_loop = False
         self.pending_ask = None
+        self.pending_line_index = None
 
         if self.resume_context:
             self.resume_loop()
         elif self.resume_state:
-      
             i = self.resume_state["index"]
             self.resume_state = None
             self.execute_block(self.lines[i:])
-        elif self.pending_line_index is not None:
-            self.execute_block(self.lines[self.pending_line_index:])
-            self.pending_line_index = None
         else:
             self.execute_block(self.lines)
 
@@ -197,40 +194,17 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
         value = self.memory.get(var, "")
-        if not isinstance(value, str) or value.strip() == "":
+        if value.strip() == "":
             self.pending_ask = AskException(question, var)
             raise self.pending_ask
 
-    def handle_if_else(self, block):
-        condition_line = block[0]
-        condition = condition_line.replace("IF", "").replace("THEN", "").strip()
-
-        true_block = []
-        false_block = []
-        current_block = true_block
-
-        i = 1
-        nested = 0
-        while i < len(block) - 1:
-            line = block[i]
-            if line == "ELSE" and nested == 0:
-                current_block = false_block
-                i += 1
-                continue
-            if line.startswith("IF "):
-                nested += 1
-            elif line == "END":
-                if nested > 0:
-                    nested -= 1
-            current_block.append(line)
-            i += 1
-
-        if self.evaluate_condition(condition):
-            self.execute_block(true_block)
-        else:
-            self.execute_block(false_block)
+    def _reset_ask_vars_in_block(self, block):
+        for line in block:
+            if line.startswith("ASK "):
+                match = re.match(r'ASK\s+".+?"\s+as\s+(\w+)', line)
+                if match:
+                    self.memory[match.group(1)] = ""
 
     def handle_repeat_n_times(self, block):
         match = re.match(r'REPEAT\s+(\d+)\s+times', block[0])
@@ -249,24 +223,19 @@ class StructuredJargonInterpreter:
     def _resume_repeat_n(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
-    
         while ctx["index"] < ctx["times"]:
             self.break_loop = False
-            self.pending_line_index = None
-    
+            self._reset_ask_vars_in_block(block)
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
-                # DO NOT increment index here!
                 raise e
             else:
                 ctx["index"] += 1
-    
             if self.break_loop:
                 break
-    
         self.resume_context = None
-    
+
     def handle_repeat_until(self, block):
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
         self.resume_context = {
@@ -275,30 +244,22 @@ class StructuredJargonInterpreter:
             "condition": condition_line
         }
         self._resume_repeat_until(self.resume_context)
-    
+
     def _resume_repeat_until(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
         condition = ctx["condition"]
-    
         while True:
             self.break_loop = False
-            self.pending_line_index = None
-    
+            self._reset_ask_vars_in_block(block)
             if self.evaluate_condition(condition):
                 break
-    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
-                self.resume_context = ctx
-                self.resume_state = None
-                self.pending_line_index = None
                 raise e
-    
             if self.break_loop:
                 break
-    
         self.resume_context = None
 
     def handle_repeat_for_each(self, block):
@@ -323,24 +284,18 @@ class StructuredJargonInterpreter:
     def _resume_repeat_foreach(self, ctx):
         self.resume_context = ctx
         block = ctx["block"]
-    
         while ctx["index"] < len(ctx["items"]):
             self.memory[ctx["var"]] = ctx["items"][ctx["index"]]
             self.break_loop = False
-            self.pending_line_index = None
-    
+            self._reset_ask_vars_in_block(block)
             try:
                 self.execute_block(block[1:-1])
-                ctx["index"] += 1
             except AskException as e:
-                self.resume_context = ctx
-                self.resume_state = None
-                self.pending_line_index = None
                 raise e
-    
+            else:
+                ctx["index"] += 1
             if self.break_loop:
                 break
-    
         self.resume_context = None
 
     def safe_eval(self, expr):
@@ -353,7 +308,7 @@ class StructuredJargonInterpreter:
                 **self.memory
             })
         except Exception as e:
-            self.output_log.append(f"[ERROR] Eval failed: {e} — in ({expr})")
+            self.output_log.append(f"[ERROR] Eval failed: {e} â in ({expr})")
             return None
 
     def evaluate_condition(self, text: str) -> bool:
@@ -394,5 +349,5 @@ class StructuredJargonInterpreter:
                 self.output_log.append(f"[ERROR] Unrecognized condition: {text}")
                 return False
         except Exception as e:
-            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} — in ({text})")
+            self.output_log.append(f"[ERROR] Condition evaluation failed: {e} â in ({text})")
             return False
