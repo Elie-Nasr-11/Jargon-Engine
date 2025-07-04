@@ -60,7 +60,11 @@ class StructuredJargonInterpreter:
     def resume_loop(self):
         context = self.resume_context
         if not context:
-            return
+            return {
+                "output": self.output_log,
+                "memory": self.memory
+            }
+    
         loop_type = context["type"]
         if loop_type == "times":
             self._resume_repeat_n(context)
@@ -68,6 +72,11 @@ class StructuredJargonInterpreter:
             self._resume_repeat_until(context)
         elif loop_type == "foreach":
             self._resume_repeat_foreach(context)
+    
+        return {
+            "output": self.output_log,
+            "memory": self.memory
+        }
 
     def execute_block(self, block):
         i = 0
