@@ -13,23 +13,24 @@ class StructuredJargonInterpreter:
         self.break_loop = False
 
     def resume(self, memory: dict):
-        self.memory = memory.copy()
-        self.output_log = []
-        self.break_loop = False
-        self.pending_ask = None
+    self.memory = memory.copy()
+    self.output_log = []
+    self.break_loop = False
+    self.pending_ask = None  
     
+    try:
         if self.resume_context:
             self.resume_loop()
         else:
             self.execute_block(self.lines)
-    
-        if not self.pending_ask:
-            self.resume_context = None
-    
-        return {
-            "output": self.output_log,
-            "memory": self.memory
-        }
+    except AskException as ask:
+        self.pending_ask = ask  
+        raise ask
+
+    return {
+        "output": self.output_log,
+        "memory": self.memory
+    }
     
     def run(self, code: str, memory: dict):
         self.code = code                                   
