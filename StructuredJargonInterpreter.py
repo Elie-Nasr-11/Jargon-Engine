@@ -23,7 +23,7 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
     
         if self.resume_context:
-            return self._resume_repeat_n(self.resume_context)
+            self._resume_repeat_n(self.resume_context)
         elif self.resume_state:
             i = self.resume_state["index"]
             self.resume_state = None
@@ -79,6 +79,7 @@ class StructuredJargonInterpreter:
         }
 
     def execute_block(self, block):
+        self.pending_ask = None
         i = 0
         steps = 0
         while i < len(block):
@@ -268,6 +269,7 @@ class StructuredJargonInterpreter:
                 break
     
         print("✅ Exiting _resume_repeat_n cleanly")
+        self.pending_ask = None
         self.resume_context = None
     
     def handle_repeat_until(self, block):
