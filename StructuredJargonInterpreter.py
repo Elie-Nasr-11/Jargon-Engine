@@ -19,7 +19,7 @@ class StructuredJargonInterpreter:
         self.pending_ask = None
         self.resume_loop()
         return {
-            "output": '\n'.join(self.output_log),
+            "output": self.output_log,
             "memory": self.memory
         }
 
@@ -38,7 +38,7 @@ class StructuredJargonInterpreter:
             self.execute_block(self.lines)
 
         return {
-            "output": '\n'.join(self.output_log),
+            "output": self.output_log,
             "memory": self.memory
         }
 
