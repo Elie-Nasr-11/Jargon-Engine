@@ -68,7 +68,7 @@ async def resume_code(req: Request):
         interpreter.memory[var] = value
         interpreter.pending_ask = None
 
-        result = interpreter.run(interpreter.code, interpreter.memory)
+        result = interpreter.resume(interpreter.memory)
         return {
             "result": result["output"],
             "memory": result["memory"]
