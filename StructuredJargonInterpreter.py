@@ -38,12 +38,12 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.pending_ask = None
         self.break_loop = False
-
+    
         try:
             self.execute()
         except AskException as e:
             self.pending_ask = e
-
+    
         return {
             "output": self.output_log,
             "memory": self.memory
@@ -223,10 +223,19 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         count = int(match.group(1))
-        for _ in range(count):
+        start_index = 0
+        
+        if self.loop_stack and self.loop_stack[-1][0] == "REPEAT":
+            _, saved_block, i, saved_count = self.loop_stack.pop()
+            if saved_block == block:
+                start_index = i + 1
+                count = saved_count
+    
+        for i in range(start_index, count):
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
+                self.loop_stack.append(("REPEAT", block, i, count))
                 raise e
             if self.pending_ask:
                 return
