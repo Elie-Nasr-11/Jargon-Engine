@@ -261,7 +261,8 @@ class StructuredJargonInterpreter:
             if self.break_loop:
                 break
 
-    self.resume_context = None
+        self.resume_context = None
+    
     def handle_repeat_until(self, block):
         condition_line = block[0].replace("REPEAT_UNTIL", "").strip()
         self.resume_context = {
