@@ -223,11 +223,13 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid REPEAT syntax: {block[0]}")
             return
         count = int(match.group(1))
-        for i in range(count):
+        for _ in range(count):
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+            if self.pending_ask:
+                return
             if self.break_loop:
                 self.break_loop = False
                 break
@@ -239,6 +241,8 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+            if self.pending_ask:
+                return 
             if self.break_loop:
                 self.break_loop = False
                 break
@@ -259,6 +263,8 @@ class StructuredJargonInterpreter:
                 self.execute_block(block[1:-1])
             except AskException as e:
                 raise e
+            if self.pending_ask:
+                return 
             if self.break_loop:
                 self.break_loop = False
                 break
