@@ -254,6 +254,13 @@ class StructuredJargonInterpreter:
             self.break_loop = False
             self.pending_line_index = None
     
+            # 👇 Force re-asking
+            for line in block[1:-1]:
+                match = re.match(r'ASK\s+"(.+?)"\s+as\s+(\w+)', line)
+                if match:
+                    _, var = match.groups()
+                    self.memory[var] = ""
+    
             try:
                 self.execute_block(block[1:-1])
             except AskException as e:
@@ -263,15 +270,13 @@ class StructuredJargonInterpreter:
                 print("❌ Other exception:", str(e))
                 raise e
             else:
-                ctx["index"] += 1  # ✅ Move here: only advance if no ASK interrupted
+                ctx["index"] += 1  # Only increment if no ASK interrupted
     
             if self.break_loop:
                 break
     
         print("✅ Exiting _resume_repeat_n cleanly")
-        self.pending_ask = None
         self.resume_context = None
-        
         return {
             "output": self.output_log,
             "memory": self.memory
