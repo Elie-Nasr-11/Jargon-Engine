@@ -47,6 +47,18 @@ async def run_code(req: Request):
         }
 
     except Exception as e:
+        error_trace = traceback.format_exc()
+        print("==== SERVER ERROR (/run) ====")
+        print(error_trace)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "trace": error_trace
+            }
+        )
+
+    except Exception as e:
         print("==== SERVER ERROR (/run) ====")
         print(traceback.format_exc())
         return JSONResponse(status_code=500, content={"error": str(e)})
