@@ -7,21 +7,21 @@ from AskException import AskException
 app = FastAPI()
 interpreter = StructuredJargonInterpreter()
 
-# ✅ CORSMiddleware must come before any routes
+# ✅ Enable CORS for Netlify frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://jargoninterpreter.netlify.app"],  # No trailing slash
+    allow_origins=["https://jargoninterpreter.netlify.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Health check
+# ✅ Health check route
 @app.get("/")
 async def root():
     return {"message": "Backend is live"}
 
-# ✅ Main code route
+# ✅ POST /run route
 @app.post("/run")
 async def run_code(req: Request):
     data = await req.json()
@@ -42,7 +42,12 @@ async def run_code(req: Request):
             "memory": interpreter.memory
         }
 
-# ✅ Resume route
+# ✅ Handle OPTIONS /run
+@app.options("/run", include_in_schema=False)
+async def run_options():
+    return JSONResponse(content={}, status_code=204)
+
+# ✅ POST /resume route
 @app.post("/resume")
 async def resume_code(req: Request):
     data = await req.json()
@@ -66,7 +71,12 @@ async def resume_code(req: Request):
             "memory": interpreter.memory
         }
 
-# ✅ CORS preflight fallback for all unmatched OPTIONS
+# ✅ Handle OPTIONS /resume
+@app.options("/resume", include_in_schema=False)
+async def resume_options():
+    return JSONResponse(content={}, status_code=204)
+
+# ✅ Global fallback for unmatched OPTIONS (just in case)
 @app.options("/{rest_of_path:path}", include_in_schema=False)
 async def preflight_handler(rest_of_path: str):
     return JSONResponse(status_code=204, content={})
