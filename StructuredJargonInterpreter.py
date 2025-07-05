@@ -42,12 +42,17 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.pending_ask = None
         self.break_loop = False
-    
+
         try:
             if self.loop_stack:
                 loop_type, block, i, count = self.loop_stack[-1]
                 for j in range(i, count):
                     self.loop_stack[-1] = (loop_type, block, j, count)
+
+                    if self.pending_ask:
+                        if self.pending_ask.variable in self.memory:
+                            del self.memory[self.pending_ask.variable]
+
                     try:
                         self.execute_block(block[1:-1])
                     except AskException as e:
@@ -59,17 +64,16 @@ class StructuredJargonInterpreter:
                     if self.break_loop:
                         self.break_loop = False
                         break
+
                 self.loop_stack.pop()
-                return {
-                    "output": self.output_log,
-                    "memory": self.memory
-                }
-    
-            self.execute()
-    
+                self.execute()  
+
+            else:
+                self.execute()
+
         except AskException as e:
             self.pending_ask = e
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
