@@ -38,6 +38,7 @@ async def run_code(req: Request):
                 "memory": result["memory"]
             }
 
+        result = interpreter.run(code)
         return {
             "result": result["output"],
             "memory": result["memory"]
