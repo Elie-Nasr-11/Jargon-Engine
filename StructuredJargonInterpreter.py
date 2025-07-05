@@ -48,9 +48,8 @@ class StructuredJargonInterpreter:
                 loop_type, block, i, count = self.loop_stack[-1]
                 for j in range(i, count):
                     self.loop_stack[-1] = (loop_type, block, j, count)
-                    if self.pending_ask:
-                        if self.pending_ask.variable in self.memory:
-                            del self.memory[self.pending_ask.variable]
+                    if self.pending_ask and self.pending_ask.variable in self.memory:
+                        del self.memory[self.pending_ask.variable]
                     try:
                         self.execute_block(block[1:-1])
                     except AskException as e:
@@ -81,13 +80,11 @@ class StructuredJargonInterpreter:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps.")
                 break
             steps += 1
-
             line = self.lines[self.current_line_index]
             if self.break_loop:
                 self.break_loop = False
                 self.current_line_index += 1
                 continue
-
             if line == "BREAK":
                 self.break_loop = True
             elif line.startswith("SET "):
@@ -121,10 +118,9 @@ class StructuredJargonInterpreter:
                 self.current_line_index = jump
                 continue
             elif line == "END":
-                pass  # Do nothing for END directly
+                pass
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
-
             self.current_line_index += 1
             if self.pending_ask:
                 raise self.pending_ask
@@ -209,7 +205,6 @@ class StructuredJargonInterpreter:
         condition_line = block[0]
         condition = condition_line.replace("IF", "").replace("THEN", "").strip()
         condition_result = self.evaluate_condition(condition)
-
         true_block, false_block = [], []
         current_block = true_block
         i = 1
@@ -220,7 +215,6 @@ class StructuredJargonInterpreter:
             else:
                 current_block.append(line)
             i += 1
-
         try:
             self.execute_block(true_block if condition_result else false_block)
         except AskException as e:
@@ -233,12 +227,10 @@ class StructuredJargonInterpreter:
             return
         count = int(match.group(1))
         start_index = 0
-
         if self.loop_stack and self.loop_stack[-1][1] == block:
             _, _, i, saved_count = self.loop_stack.pop()
             start_index = i + 1
             count = saved_count
-
         for i in range(start_index, count):
             self.loop_stack.append(("REPEAT", block, i, count))
             try:
@@ -279,7 +271,6 @@ class StructuredJargonInterpreter:
         if self.loop_stack and self.loop_stack[-1][0] == "REPEAT_FOR_EACH":
             _, _, saved_index, _ = self.loop_stack.pop()
             start_index = saved_index + 1
-
         for i in range(start_index, len(items)):
             self.memory[var] = items[i]
             try:
@@ -302,7 +293,6 @@ class StructuredJargonInterpreter:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps.")
                 break
             steps += 1
-
             line = lines[index]
             if line == "BREAK":
                 self.break_loop = True
@@ -341,7 +331,6 @@ class StructuredJargonInterpreter:
                 pass
             else:
                 self.output_log.append(f"[ERROR] Unknown command in block: {line}")
-
             if self.pending_ask:
                 raise self.pending_ask
             index += 1
@@ -383,10 +372,6 @@ class StructuredJargonInterpreter:
             elif "is in" in cond:
                 a, b = cond.split("is in")
                 return self.safe_eval(a) in self.safe_eval(b)
-            elif "is even" in cond:
-                return self.safe_eval(cond.split("is even")[0]) % 2 == 0
-            elif "is odd" in cond:
-                return self.safe_eval(cond.split("is odd")[0]) % 2 == 1
             return False
         except Exception as e:
             self.output_log.append(f"[ERROR] Condition evaluation failed: {e} in ({cond})")
