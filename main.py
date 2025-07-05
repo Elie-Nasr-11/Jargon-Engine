@@ -8,10 +8,9 @@ import traceback
 app = FastAPI()
 interpreter = StructuredJargonInterpreter()
 
-# Allow CORS (adjust allowed origins in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this to your frontend URL in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,7 +18,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Jargon backend is live."}
+    return {"message": "Jargon Backend is live"}
 
 @app.post("/run")
 async def run_code(req: Request):
@@ -30,27 +29,23 @@ async def run_code(req: Request):
 
         result = interpreter.run(code, memory)
 
-        if interpreter.pending_ask:
-            return {
-                "ask": interpreter.pending_ask.prompt,
-                "ask_var": interpreter.pending_ask.variable,
-                "result": result["output"],
-                "memory": result["memory"]
-            }
-
-        result = interpreter.run(code)
-        return {
-            "result": result["output"],
+        response = {
+            "result": result["output"] or ["[No output returned]"],
             "memory": result["memory"]
         }
 
+        if interpreter.pending_ask:
+            response.update({
+                "ask": interpreter.pending_ask.prompt,
+                "ask_var": interpreter.pending_ask.variable,
+            })
+
+        return response
+
     except Exception as e:
         print("==== SERVER ERROR (/run) ====")
-        print(traceback.format_exc())
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e), "trace": traceback.format_exc()}
-        )
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/resume")
 async def resume_code(req: Request):
@@ -66,26 +61,23 @@ async def resume_code(req: Request):
 
         result = interpreter.resume(code, memory)
 
-        if interpreter.pending_ask:
-            return {
-                "ask": interpreter.pending_ask.prompt,
-                "ask_var": interpreter.pending_ask.variable,
-                "result": result["output"],
-                "memory": result["memory"]
-            }
-
-        return {
-            "result": result["output"],
+        response = {
+            "result": result["output"] or ["[No output returned]"],
             "memory": result["memory"]
         }
 
+        if interpreter.pending_ask:
+            response.update({
+                "ask": interpreter.pending_ask.prompt,
+                "ask_var": interpreter.pending_ask.variable,
+            })
+
+        return response
+
     except Exception as e:
         print("==== SERVER ERROR (/resume) ====")
-        print(traceback.format_exc())
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e), "trace": traceback.format_exc()}
-        )
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.options("/{rest_of_path:path}", include_in_schema=False)
 async def preflight_handler(rest_of_path: str):
