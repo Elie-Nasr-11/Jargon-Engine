@@ -13,6 +13,10 @@ class StructuredJargonInterpreter:
         self.break_loop = False
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.execute_block(self.lines)
+        return {
+            "output": self.output_log,
+            "memory": self.memory
+        }
 
     def execute_block(self, block):
         i = 0
@@ -99,7 +103,7 @@ class StructuredJargonInterpreter:
     def handle_print(self, line):
         expr = line[6:].strip()
         val = self.safe_eval(expr)
-        self.output_log.append(str(val))
+        self.output_log.append(str(val)) 
 
     def handle_add(self, line):
         match = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
