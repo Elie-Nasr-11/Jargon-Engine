@@ -28,6 +28,7 @@ async def run_code(req: Request):
         code = data.get("code", "")
         memory = data.get("memory", {})
 
+        interpreter = StructuredJargonInterpreter()  # create new instance
         result = interpreter.run(code, memory)
 
         if interpreter.pending_ask:
@@ -70,6 +71,7 @@ async def resume_code(req: Request):
         print(">>> Code snippet:\n", code)
         print(">>> Memory:", memory)
 
+        interpreter = StructuredJargonInterpreter()  # new instance here too
         result = interpreter.resume(code, memory)
 
         if interpreter.pending_ask:
@@ -79,7 +81,7 @@ async def resume_code(req: Request):
                 "result": result["output"],
                 "memory": result["memory"]
             }
-        
+
         return {
             "result": result["output"],
             "memory": result["memory"]
