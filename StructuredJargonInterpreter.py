@@ -175,11 +175,11 @@ class StructuredJargonInterpreter:
             return
         question, var = match.groups()
     
-        if var not in self.memory:
-            self.memory[var] = ""
+        if var in self.memory and self.memory[var] not in ["", None]:
+            return
     
-        if self.memory[var] == "":
-            raise AskException(question, var)
+        self.memory[var] = ""
+        raise AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
