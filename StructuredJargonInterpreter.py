@@ -1,4 +1,5 @@
 import re
+from AskException import AskException
 
 class StructuredJargonInterpreter:
     def __init__(self):
@@ -6,13 +7,24 @@ class StructuredJargonInterpreter:
         self.output_log = []
         self.max_steps = 1000
         self.break_loop = False
+        self.pending_ask = None
 
-    def run(self, code: str):
-        self.memory.clear()
-        self.output_log.clear()
-        self.break_loop = False
+    def run(self, code: str, memory: dict):
+        self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
-        self.execute_block(self.lines)
+        self.memory = memory.copy()
+        self.output_log = []
+        self.pending_ask = None
+        self.current_line_index = 0
+        self.break_loop = False
+        self.resume_line_index = 0
+        self.loop_stack = []
+    
+        try:
+            self.execute()
+        except AskException as e:
+            self.pending_ask = e
+    
         return {
             "output": self.output_log,
             "memory": self.memory
@@ -137,7 +149,8 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        self.memory[var] = input(question + " ")
+        if var not in self.memory or self.memory[var] == "":
+            raise AskException(question, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
