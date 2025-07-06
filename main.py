@@ -8,6 +8,7 @@ import traceback
 app = FastAPI()
 interpreter = StructuredJargonInterpreter()
 
+# Allow all origins for development (change for production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,8 +31,8 @@ async def run_code(req: Request):
         result = interpreter.run(code, memory)
 
         response = {
-            "result": result["output"] or ["[No output returned]"],
-            "memory": result["memory"]
+            "result": result.get("output", []) or ["[No output returned]"],
+            "memory": result.get("memory", {})
         }
 
         if interpreter.pending_ask:
@@ -62,8 +63,8 @@ async def resume_code(req: Request):
         result = interpreter.resume(code, memory)
 
         response = {
-            "result": result["output"] or ["[No output returned]"],
-            "memory": result["memory"]
+            "result": result.get("output", []) or ["[No output returned]"],
+            "memory": result.get("memory", {})
         }
 
         if interpreter.pending_ask:
