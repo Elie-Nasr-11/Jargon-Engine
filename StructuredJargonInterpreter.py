@@ -4,8 +4,6 @@ class AskException(Exception):
     def __init__(self, prompt, variable):
         self.prompt = prompt
         self.variable = variable
-        self.pending_question = None
-        self.pending_variable = None
 
 class StructuredJargonInterpreter:
     def __init__(self):
@@ -14,6 +12,9 @@ class StructuredJargonInterpreter:
         self.max_steps = 1000
         self.break_loop = False
         self.pending_ask = None
+        self.pending_question = None
+        self.answers = []
+        self.answer_index = 0
 
     def run(self, code: str, preset_answers: dict = None):
         self.memory.clear()
@@ -34,8 +35,8 @@ class StructuredJargonInterpreter:
         return {
             "output": self.output_log if self.output_log else ["[No output returned]"],
             "memory": self.memory,
-            "ask": self.pending_ask.prompt if self.pending_ask else None,
-            "ask_var": self.pending_ask.variable if self.pending_ask else None
+            "ask": self.pending_question["prompt"] if self.pending_question else None,
+            "ask_var": self.pending_question["variable"] if self.pending_question else None
         }
 
     def execute_block(self, block):
@@ -156,11 +157,17 @@ class StructuredJargonInterpreter:
         if not match:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
-        question, var = match.groups()
-        if var not in self.memory or self.memory[var] == "":
-            self.pending_question = question
-            self.pending_variable = var
-            raise StopIteration  
+        prompt, var = match.groups()
+    
+        if self.answer_index < len(self.answers):
+            self.memory[var] = self.answers[self.answer_index]
+            self.answer_index += 1
+        else:
+            self.pending_question = {
+                "prompt": prompt,
+                "variable": var
+            }
+            raise AskException(prompt, var)
 
     def handle_if_else(self, block):
         condition_line = block[0]
