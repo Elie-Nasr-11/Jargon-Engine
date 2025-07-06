@@ -30,6 +30,18 @@ class StructuredJargonInterpreter:
             "memory": self.memory
         }
 
+    def resume(self, code: str, memory: dict):
+        self.memory = memory.copy()
+        self.pending_ask = None
+        try:
+            self.execute()
+        except AskException as e:
+            self.pending_ask = e
+        return {
+            "output": self.output_log,
+            "memory": self.memory
+        }
+    
     def execute_block(self, block):
         i = 0
         steps = 0
