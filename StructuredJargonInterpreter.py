@@ -33,15 +33,16 @@ class StructuredJargonInterpreter:
         self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
-        self.output_log = ["[No output returned]"]
-        self.pending_ask = None
         self.break_loop = False
-
+    
         try:
             self.execute_block(self.lines)
         except AskException as e:
             self.pending_ask = e
-
+    
+        if not self.output_log:
+            self.output_log = ["[No output returned]"]
+    
         return {
             "output": self.output_log,
             "memory": self.memory
