@@ -13,14 +13,14 @@ class StructuredJargonInterpreter:
         self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
-        self.output_log = []
+        self.output_log = ["[No output returned]"]
         self.pending_ask = None
         self.break_loop = False
         self.resume_line_index = 0
         self.loop_stack = []
 
         try:
-            self.execute_block(self.lines)  # THIS was missing
+            self.execute_block(self.lines)
         except AskException as e:
             self.pending_ask = e
 
@@ -30,7 +30,22 @@ class StructuredJargonInterpreter:
         }
 
     def resume(self, code: str, memory: dict):
-        return self.run(code, memory)
+        self.code = code
+        self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
+        self.memory = memory.copy()
+        self.output_log = ["[No output returned]"]
+        self.pending_ask = None
+        self.break_loop = False
+
+        try:
+            self.execute_block(self.lines)
+        except AskException as e:
+            self.pending_ask = e
+
+        return {
+            "output": self.output_log,
+            "memory": self.memory
+        }
 
     def execute_block(self, block):
         i = 0
@@ -117,7 +132,9 @@ class StructuredJargonInterpreter:
     def handle_print(self, line):
         expr = line[6:].strip()
         val = self.safe_eval(expr)
-        self.output_log.append(str(val)) 
+        if "[No output returned]" in self.output_log:
+            self.output_log.remove("[No output returned]")
+        self.output_log.append(str(val))
 
     def handle_add(self, line):
         match = re.match(r'ADD\s+(.+?)\s+to\s+(\w+)', line)
