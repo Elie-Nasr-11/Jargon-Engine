@@ -4,6 +4,8 @@ class AskException(Exception):
     def __init__(self, prompt, variable):
         self.prompt = prompt
         self.variable = variable
+        self.pending_question = None
+        self.pending_variable = None
 
 class StructuredJargonInterpreter:
     def __init__(self):
@@ -155,8 +157,10 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        if var not in self.memory or self.memory[var] in ["", None]:
-            raise AskException(question, var)
+        if var not in self.memory or self.memory[var] == "":
+            self.pending_question = question
+            self.pending_variable = var
+            raise StopIteration  
 
     def handle_if_else(self, block):
         condition_line = block[0]
