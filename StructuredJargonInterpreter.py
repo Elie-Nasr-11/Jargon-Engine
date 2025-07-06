@@ -158,10 +158,17 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         prompt, var = match.groups()
-    
+        
         if self.answer_index < len(self.answers):
-            self.memory[var] = self.answers[self.answer_index]
+            raw = self.answers[self.answer_index]
             self.answer_index += 1
+    
+            try:
+                value = int(raw)
+            except ValueError:
+                value = raw
+    
+            self.memory[var] = value
         else:
             self.pending_question = {
                 "prompt": prompt,
