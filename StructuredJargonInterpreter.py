@@ -8,16 +8,20 @@ class StructuredJargonInterpreter:
         self.max_steps = 1000
         self.break_loop = False
         self.pending_ask = None
+        self.resume_context = None
 
     def run(self, code: str, memory: dict):
         self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.output_log = ["[No output returned]"]
-        self.pending_ask = None
         self.break_loop = False
-        self.resume_line_index = 0
-        self.loop_stack = []
+        self.pending_ask = None
+        self.resume_context = {
+            "line": 0,
+            "block": self.lines,
+            "index": 0
+        }
 
         try:
             self.execute_block(self.lines)
@@ -34,40 +38,48 @@ class StructuredJargonInterpreter:
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.break_loop = False
-    
+
         if var and value is not None:
-            self.memory[var] = value  
-    
+            self.memory[var] = value
+
         self.pending_ask = None
-    
+
         try:
-            self.execute_block(self.lines)
+            self.execute_block(self.resume_context["block"], self.resume_context["index"])
         except AskException as e:
             self.pending_ask = e
-    
+
         if not self.output_log:
             self.output_log = ["[No output returned]"]
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
         }
 
-    def execute_block(self, block):
-        i = 0
+    def execute_block(self, block, start_index=0):
+        i = start_index
         steps = 0
         while i < len(block):
             line = block[i]
             steps += 1
+            self.resume_context = {
+                "line": i,
+                "block": block,
+                "index": i
+            }
+
             if steps > self.max_steps:
                 self.output_log.append("[ERROR] Execution stopped: Too many steps (possible infinite loop).")
                 break
+
             if self.break_loop:
                 break
+
             if line == "BREAK":
                 self.break_loop = True
                 break
-    
+
             if line.startswith("SET "):
                 self.handle_set(line)
             elif line.startswith("PRINT "):
@@ -96,10 +108,11 @@ class StructuredJargonInterpreter:
                 i = jump_to - 1
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
-    
+
             if self.pending_ask:
+                self.resume_context["index"] = i
                 break
-    
+
             i += 1
 
     def collect_block(self, lines, start, end_keyword):
@@ -179,10 +192,10 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-    
+
         if var in self.memory and self.memory[var] not in ["", None]:
             return
-    
+
         self.memory[var] = ""
         raise AskException(question, var)
 
@@ -221,7 +234,7 @@ class StructuredJargonInterpreter:
         while not self.evaluate_condition(condition_line):
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop:
+            if self.pending_ask or self.break_loop:
                 break
             count += 1
             if count > self.max_steps:
@@ -237,7 +250,7 @@ class StructuredJargonInterpreter:
         for _ in range(times):
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop:
+            if self.pending_ask or self.break_loop:
                 break
 
     def handle_repeat_for_each(self, block):
@@ -250,7 +263,7 @@ class StructuredJargonInterpreter:
             self.memory[var] = item
             self.break_loop = False
             self.execute_block(block[1:-1])
-            if self.break_loop:
+            if self.pending_ask or self.break_loop:
                 break
 
     def safe_eval(self, expr):
