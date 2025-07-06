@@ -15,33 +15,23 @@ class StructuredJargonInterpreter:
         self.memory = memory.copy()
         self.output_log = []
         self.pending_ask = None
-        self.current_line_index = 0
         self.break_loop = False
         self.resume_line_index = 0
         self.loop_stack = []
-    
+
         try:
-            self.execute()
+            self.execute_block(self.lines)  # THIS was missing
         except AskException as e:
             self.pending_ask = e
-    
+
         return {
             "output": self.output_log,
             "memory": self.memory
         }
 
     def resume(self, code: str, memory: dict):
-        self.memory = memory.copy()
-        self.pending_ask = None
-        try:
-            self.execute()
-        except AskException as e:
-            self.pending_ask = e
-        return {
-            "output": self.output_log,
-            "memory": self.memory
-        }
-    
+        return self.run(code, memory)
+
     def execute_block(self, block):
         i = 0
         steps = 0
