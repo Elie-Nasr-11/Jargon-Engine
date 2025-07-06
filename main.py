@@ -36,7 +36,7 @@ async def run_code(req: Request):
         interpreter.run(code)
 
         response = {
-            "result": interpreter.output_log or ["[No output returned]"],
+            "result": interpreter.output_log if interpreter.output_log else [],
             "memory": interpreter.memory,
         }
 
