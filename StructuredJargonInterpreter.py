@@ -29,11 +29,16 @@ class StructuredJargonInterpreter:
             "memory": self.memory
         }
 
-    def resume(self, code: str, memory: dict):
+    def resume(self, code: str, memory: dict, var: str = None, value: str = None):
         self.code = code
         self.lines = [line.strip() for line in code.strip().split('\n') if line.strip()]
         self.memory = memory.copy()
         self.break_loop = False
+    
+        if var and value is not None:
+            self.memory[var] = value  
+    
+        self.pending_ask = None
     
         try:
             self.execute_block(self.lines)
