@@ -61,6 +61,7 @@ class StructuredJargonInterpreter:
             if line == "BREAK":
                 self.break_loop = True
                 break
+    
             if line.startswith("SET "):
                 self.handle_set(line)
             elif line.startswith("PRINT "):
@@ -89,6 +90,10 @@ class StructuredJargonInterpreter:
                 i = jump_to - 1
             else:
                 self.output_log.append(f"[ERROR] Unknown command: {line}")
+    
+            if self.pending_ask:
+                break
+    
             i += 1
 
     def collect_block(self, lines, start, end_keyword):
@@ -168,7 +173,11 @@ class StructuredJargonInterpreter:
             self.output_log.append(f"[ERROR] Invalid ASK syntax: {line}")
             return
         question, var = match.groups()
-        if var not in self.memory or self.memory[var] == "":
+    
+        if var not in self.memory:
+            self.memory[var] = ""
+    
+        if self.memory[var] == "":
             raise AskException(question, var)
 
     def handle_if_else(self, block):
