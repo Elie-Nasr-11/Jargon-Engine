@@ -2,13 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from StructuredJargonInterpreter import StructuredJargonInterpreter
-from AskException import AskException
 import traceback
 
 app = FastAPI()
-interpreter = StructuredJargonInterpreter()
 
-# Allow all origins for development (change for production)
+# Allow all origins for development (adjust for production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,33 +17,33 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Jargon Backend is live"}
+    return {"message": "Jargon Backend is live."}
 
 @app.post("/run")
 async def run_code(req: Request):
     try:
         data = await req.json()
         code = data.get("code", "")
-        memory = data.get("memory", {})
+        answers = data.get("answers", [])
 
-        print("=== /run Called ===")
-        print("Code:\n", code)
-        print("Initial Memory:", memory)
+        interpreter = StructuredJargonInterpreter()
 
-        result = interpreter.run(code, memory)
+        # Internal answer index tracking
+        interpreter.answers = answers
+        interpreter.answer_index = 0
 
-        print("Interpreter Output Log:", result.get("output"))
-        print("Interpreter Memory:", result.get("memory"))
+        # Run code
+        interpreter.run(code)
 
         response = {
-            "result": result.get("output", []) or ["[No output returned]"],
-            "memory": result.get("memory", {})
+            "result": interpreter.output_log or ["[No output returned]"],
+            "memory": interpreter.memory,
         }
 
-        if interpreter.pending_ask:
+        if interpreter.pending_question:
             response.update({
-                "ask": interpreter.pending_ask.prompt,
-                "ask_var": interpreter.pending_ask.variable,
+                "ask": interpreter.pending_question["prompt"],
+                "ask_var": interpreter.pending_question["variable"],
             })
 
         return response
@@ -54,44 +52,3 @@ async def run_code(req: Request):
         print("==== SERVER ERROR (/run) ====")
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.post("/resume")
-async def resume_code(req: Request):
-    try:
-        data = await req.json()
-        code = data.get("code", "")
-        memory = data.get("memory", {})
-        var = data.get("var")
-        value = data.get("value")
-
-        print("=== /resume Called ===")
-        print("Resuming with:", var, "=", value)
-        print("Memory before resume:", memory)
-
-        # Pass var and value explicitly
-        result = interpreter.resume(code, memory, var, value)
-
-        print("Interpreter Output Log:", result.get("output"))
-        print("Interpreter Memory:", result.get("memory"))
-
-        response = {
-            "result": result.get("output", []) or ["[No output returned]"],
-            "memory": result.get("memory", {})
-        }
-
-        if interpreter.pending_ask:
-            response.update({
-                "ask": interpreter.pending_ask.prompt,
-                "ask_var": interpreter.pending_ask.variable,
-            })
-
-        return response
-
-    except Exception as e:
-        print("==== SERVER ERROR (/resume) ====")
-        traceback.print_exc()
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.options("/{rest_of_path:path}", include_in_schema=False)
-async def preflight_handler(rest_of_path: str):
-    return JSONResponse(status_code=204, content={})
