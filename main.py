@@ -28,7 +28,14 @@ async def run_code(req: Request):
         code = data.get("code", "")
         memory = data.get("memory", {})
 
+        print("=== /run Called ===")
+        print("Code:\n", code)
+        print("Initial Memory:", memory)
+
         result = interpreter.run(code, memory)
+
+        print("Interpreter Output Log:", result.get("output"))
+        print("Interpreter Memory:", result.get("memory"))
 
         response = {
             "result": result.get("output", []) or ["[No output returned]"],
@@ -60,7 +67,14 @@ async def resume_code(req: Request):
         if var:
             memory[var] = value
 
+        print("=== /resume Called ===")
+        print("Resuming with:", var, "=", value)
+        print("Memory before resume:", memory)
+
         result = interpreter.resume(code, memory)
+
+        print("Interpreter Output Log:", result.get("output"))
+        print("Interpreter Memory:", result.get("memory"))
 
         response = {
             "result": result.get("output", []) or ["[No output returned]"],
