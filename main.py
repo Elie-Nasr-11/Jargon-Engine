@@ -64,14 +64,12 @@ async def resume_code(req: Request):
         var = data.get("var")
         value = data.get("value")
 
-        if var:
-            memory[var] = value
-
         print("=== /resume Called ===")
         print("Resuming with:", var, "=", value)
         print("Memory before resume:", memory)
 
-        result = interpreter.resume(code, memory)
+        # Pass var and value explicitly
+        result = interpreter.resume(code, memory, var, value)
 
         print("Interpreter Output Log:", result.get("output"))
         print("Interpreter Memory:", result.get("memory"))
